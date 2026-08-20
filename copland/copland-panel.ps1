@@ -402,7 +402,7 @@ while ($true) {
                 if ($info) { SubRow $info }
                 if ($prog) { SubRow $prog }
                 # burn-kurve: 5h-verlauf der letzten ~30 min (braille, sonst ascii)
-                if ($pair[0] -eq '5h' -and $hist.Count -ge 8) {
+                if ($pair[0] -eq '5h' -and $hist.Count -ge 8 -and $p5 -ge 40) {
                     $pts = @($hist | Select-Object -Last 18 | ForEach-Object { [double]$_.p })
                     $bc = ConvertTo-BrailleChart $pts 18 3 100
                     if ($bc) {
@@ -487,14 +487,19 @@ while ($true) {
         Write-Host $SEPLINE
         Write-Host ""
         Row 'rat' "${FG}frei$R $DIM[0 eur]$R"
+        # schwellwert-prinzip: nur stimmen zeigen, die heute benutzt wurden
+        $ratShown = 0
         foreach ($rv in $ratActive) {
             $n = 0
             if ($ruToday -and ($ru.PSObject.Properties.Name -contains $rv.cnt)) { $n = [int]$ru.($rv.cnt) }
+            if ($n -le 0) { continue }
+            $ratShown++
             $p = [math]::Round($n / $rv.limit * 100)
             $col = if ($p -ge 80) { $WARN } else { $FG }
             Row $rv.lbl "$col[$(Bar $p 12)] $p%$R"
             SubRow "$($rv.info) $n/$($rv.limit)"
         }
+        if ($ratShown -eq 0) { SubRow "$($ratActive.Count) stimmen bereit" }
         Write-Host ""
     }
 
@@ -533,9 +538,11 @@ while ($true) {
                 Write-Host "$WARN  $($svc[0]): $sdesc$R"
             }
         }
+        # release-zeile nur, wenn ein claude-code-update aussteht (schwellwert-prinzip)
         $cc = "$($aiData.cc)" -replace '^v', ''
-        $cx = "$($aiData.codex)" -replace '^rust-v', ''
-        if ($cc -or $cx) { Write-Host "$DIM  cc $cc | codex $cx$R" }
+        if ($cc -and $c -and $c.ccv -and $cc -ne "$($c.ccv)") {
+            Write-Host "$DIM  update verfuegbar: cc $cc$R"
+        }
     }
 
     # --- git-sync je aktivem repo (daten aus den session-dateien) ---

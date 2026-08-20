@@ -14,6 +14,81 @@ $DIM  = "$E[38;2;74;88;102m"     # gedimmt
 $WARN = "$E[38;2;194;132;143m"   # warnung
 $R    = "$E[0m"
 
+# ascii-balken: anteil $p (0-100) auf breite $w
+function Bar([double]$p, [int]$w) {
+    $f = [math]::Round($p / 100 * $w)
+    if ($f -gt $w) { $f = $w }
+    if ($f -lt 0)  { $f = 0 }
+    ('=' * $f) + ('.' * ($w - $f))
+}
+
+# aktivitaets-level 0-4 aus sessions/tag (EINE stelle fuer die schwellen)
+function Get-ActivityLevel([int]$v) {
+    if ($v -ge 7) { 4 } elseif ($v -ge 4) { 3 } elseif ($v -ge 2) { 2 } elseif ($v -ge 1) { 1 } else { 0 }
+}
+
+# offene-punkte.md parsen: liste aus @{sec; text}
+function Get-OffenePunkte {
+    $op = "$env:USERPROFILE\OneDrive\00_System\offene-punkte.md"
+    $out = @()
+    if (Test-Path $op) {
+        $sec = ''
+        foreach ($opl in (Get-Content $op -Encoding utf8)) {
+            if ($opl -match '^##\s+(.*)') { $sec = $Matches[1] }
+            elseif ($sec -and $opl -match '^\s*-\s*(.+)') { $out += @{ sec = $sec; text = $Matches[1] } }
+        }
+    }
+    , $out
+}
+
+# projekt-CLAUDE.md-kopfzeile + zweck/stand parsen (EIN parser fuer alle)
+function Get-ProjectMeta([string]$projPath) {
+    $meta = @{ alias = ''; status = ''; verbunden = @(); frist = ''; zweck = ''; stand = ''; hasCmd = $false }
+    $cmd = Join-Path $projPath 'CLAUDE.md'
+    if (-not (Test-Path $cmd)) { return $meta }
+    $meta.hasCmd = $true
+    $sec = ''
+    foreach ($ml in (Get-Content $cmd -Encoding utf8)) {
+        if ($ml -match '^##\s+(\S+)') { $sec = $Matches[1].ToLower(); continue }
+        if ($ml -match 'alias:\s*([^|]+)') { $meta.alias = $Matches[1].Trim() -replace '\s*,\s*', ',' }
+        if ($ml -match 'status:\s*(\w+)') { $meta.status = $Matches[1].ToLower() }
+        if ($ml -match '^Verbunden:\s*(.+)') { foreach ($ka in ($Matches[1] -split ';')) { $meta.verbunden += $ka.Trim() } }
+        if ($ml -match '^Frist:\s*(\d{4}-\d{2}-\d{2})\s*(.*)') { $meta.frist = "$($Matches[1]) $($Matches[2])" }
+        if ($sec -eq 'zweck' -and -not $meta.zweck -and $ml.Trim() -and $ml -notmatch '^#') { $meta.zweck = $ml.Trim() }
+        if ($sec -eq 'stand' -and $ml -match '^\s*-\s*(.+)') { $meta.stand = $Matches[1] }
+    }
+    $meta
+}
+
+# session-index: EIN scan ueber ~\.claude\projects, gecacht als json (10 min).
+# liefert je session-ordner (kleingeschrieben): newest (iso), s7, s30 -- plus heat (datum->anzahl, 112d)
+function Get-CoplandIndex([switch]$Force) {
+    $idxFile = "$env:LOCALAPPDATA\copland-index.json"
+    if (-not $Force -and (Test-Path $idxFile)) {
+        if (((Get-Date) - (Get-Item $idxFile).LastWriteTime).TotalMinutes -lt 10) {
+            return (Get-Content $idxFile -Raw | ConvertFrom-Json)
+        }
+    }
+    $sess = @{}
+    $heat = @{}
+    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
+        $files = @(Get-ChildItem $_.FullName -File -Filter *.jsonl)
+        if (-not $files) { return }
+        $newest = ($files | Sort-Object LastWriteTime -Descending)[0].LastWriteTime
+        $s7 = 0; $s30 = 0
+        foreach ($sf in $files) {
+            $aged = ((Get-Date) - $sf.LastWriteTime).TotalDays
+            if ($aged -le 112) { $dk = $sf.LastWriteTime.Date.ToString('yyyy-MM-dd'); $heat[$dk] = [int]$heat[$dk] + 1 }
+            if ($aged -le 7) { $s7++ }
+            if ($aged -le 30) { $s30++ }
+        }
+        $sess[$_.Name.ToLower()] = @{ newest = $newest.ToString('o'); s7 = $s7; s30 = $s30 }
+    }
+    $idx = @{ generated = (Get-Date).ToString('o'); sessions = $sess; heat = $heat }
+    $idx | ConvertTo-Json -Depth 5 -Compress | Set-Content $idxFile -Encoding utf8
+    Get-Content $idxFile -Raw | ConvertFrom-Json
+}
+
 # braille-charts: 2x4 punkte pro zelle = 8x aufloesung. auf $false stellen,
 # falls die glyphen im font haesslich rendern -> alles faellt auf ascii zurueck.
 $UseBraille = $true

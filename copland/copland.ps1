@@ -92,26 +92,30 @@ $areas = @(
     @{ key='s'; label='SYSTEM '; dir='00_System' }
 )
 
-# puls je bereich: wann lief dort zuletzt eine claude-session?
-# ** = heute, * = gestern, . = diese woche, leer = ruht
-function Get-AreaPulse {
-    $p = @{}
-    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
-        $n = $_.Name -replace '^[Cc]--Users-marep-OneDrive-', ''
-        # neueste session-DATEI zaehlt, nicht das ordner-datum (laufende sessions!)
-        $newest = @(Get-ChildItem $_.FullName -File -Filter *.jsonl |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1)
-        if (-not $newest) { return }
+# bereichs-statistik aus dem gemeinsamen index (EIN scan, gecacht -- copland-shared.ps1)
+function Get-AreaStats {
+    $idx = Get-CoplandIndex
+    $stats = @{}
+    foreach ($ar in $script:areas) { $stats[$ar.dir] = @{ newest = $null; s7 = 0 } }
+    foreach ($prop in $idx.sessions.PSObject.Properties) {
+        $n = $prop.Name -replace '^c--users-marep-onedrive-', ''
         foreach ($ar in $script:areas) {
-            $pref = $ar.dir -replace '_', '-'
-            if ($n -like "$pref*") {
-                if (-not $p[$ar.dir] -or $newest[0].LastWriteTime -gt $p[$ar.dir]) { $p[$ar.dir] = $newest[0].LastWriteTime }
+            if ($n -like "$(($ar.dir -replace '_', '-').ToLower())*") {
+                $t = [datetime]$prop.Value.newest
+                if (-not $stats[$ar.dir].newest -or $t -gt $stats[$ar.dir].newest) { $stats[$ar.dir].newest = $t }
+                $stats[$ar.dir].s7 += [int]$prop.Value.s7
             }
         }
     }
+    $stats
+}
+
+# puls je bereich: ** = heute, * = gestern, . = diese woche, leer = ruht
+function Get-AreaPulse {
+    $stats = Get-AreaStats
     $marks = @{}
     foreach ($ar in $script:areas) {
-        $t = $p[$ar.dir]
+        $t = $stats[$ar.dir].newest
         $marks[$ar.dir] = if (-not $t) { '' }
             elseif ($t.Date -eq (Get-Date).Date) { '**' }
             elseif ($t.Date -eq (Get-Date).Date.AddDays(-1)) { '*' }
@@ -121,51 +125,14 @@ function Get-AreaPulse {
     $marks
 }
 
-# balance: wie viele claude-sessions je lebensbereich in den letzten 7 tagen
-function Get-AreaBalance {
-    $bal = [ordered]@{}
-    foreach ($ba in $script:areas) { $bal[$ba.dir] = 0 }
-    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
-        $bn = $_.Name -replace '^[Cc]--Users-marep-OneDrive-', ''
-        foreach ($ba in $script:areas) {
-            if ($bn -like "$(($ba.dir -replace '_', '-'))*") {
-                $bal[$ba.dir] += @(Get-ChildItem $_.FullName -File -Filter *.jsonl |
-                    Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-7) }).Count
-            }
-        }
+# einheitliches screen-ende: [z] zurueck (kein 'beliebige taste' mehr)
+function Wait-Back {
+    Write-Host ""
+    Write-Host -NoNewline "$DIM  [z] zurueck $R"
+    while ($true) {
+        $wb = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
+        if ("$wb" -match '^[zZ]$') { return }
     }
-    $bal
-}
-
-# aktivitaet pro tag (anzahl beruehrter sessions), fuer die heatmap
-function Get-DayActivity([int]$days = 112) {
-    $act = @{}
-    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
-        Get-ChildItem $_.FullName -File -Filter *.jsonl | ForEach-Object {
-            if ($_.LastWriteTime -gt (Get-Date).AddDays(-$days)) {
-                $d = $_.LastWriteTime.Date.ToString('yyyy-MM-dd')
-                $act[$d] = [int]$act[$d] + 1
-            }
-        }
-    }
-    $act
-}
-
-# sessions je bereich und woche (8 wochen, index 0 = aelteste), fuer sparklines
-function Get-AreaWeekly {
-    $w = @{}
-    foreach ($ba in $script:areas) { $w[$ba.dir] = @(0) * 8 }
-    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
-        $bn = $_.Name -replace '^[Cc]--Users-marep-OneDrive-', ''
-        $adir = $null
-        foreach ($ba in $script:areas) { if ($bn -like "$(($ba.dir -replace '_', '-'))*") { $adir = $ba.dir; break } }
-        if (-not $adir) { return }
-        Get-ChildItem $_.FullName -File -Filter *.jsonl | ForEach-Object {
-            $ageW = [math]::Floor(((Get-Date) - $_.LastWriteTime).TotalDays / 7)
-            if ($ageW -ge 0 -and $ageW -lt 8) { $w[$adir][7 - $ageW]++ }
-        }
-    }
-    $w
 }
 
 function Show-Menu {
@@ -179,25 +146,33 @@ function Show-Menu {
     Write-Host ""
     Write-Host "$DIM  .......................................$R"
     Write-Host ""
-    # zwei spalten: links bereiche/orte, rechts tools -- halbe hoehe, ein raster
+    # zwei spalten: links NUR ziffern (0-6, sortiert), rechts NUR buchstaben (alphabetisch)
     $menuRows = @(
-        @('1', 'UNI    ', '10_uni',     '0', 'shell'),
-        @('2', 'WORK   ', '20_work',    'o', 'lokal'),
-        @('3', 'VENTURE', '30_venture', 'i', 'status'),
-        @('4', 'PRIVATE', '40_private', 'h', 'hub'),
-        @('5', 'CAREER ', '50_career',  'u', 'usage'),
-        @('s', 'SYSTEM ', '00_System',  'b', 'backup'),
-        @('7', 'WERKST ', 'dokumente',  'm', 'manual'),
-        @('a', 'ALLTAG ', 'briefing',   'q', 'beenden')
+        @('0', 'shell  ', 'powershell', 'a', 'ALLTAG ', 'briefing'),
+        @('1', 'UNI    ', '10_uni',     'b', 'backup ', ''),
+        @('2', 'WORK   ', '20_work',    'h', 'hub    ', ''),
+        @('3', 'VENTURE', '30_venture', 'm', 'manual ', ''),
+        @('4', 'PRIVATE', '40_private', 'o', 'lokal  ', ''),
+        @('5', 'CAREER ', '50_career',  'q', 'beenden', ''),
+        @('6', 'WERKST ', 'dokumente',  's', 'SYSTEM ', '00_System'),
+        @('',  '',        '',           'w', 'wired  ', '')
     )
     # laufvariable NICHT $r nennen -- ps-variablen sind case-insensitiv, $R ist der ansi-reset
     $pulse = Get-AreaPulse
     foreach ($mrow in $menuRows) {
         $mk = ''
         foreach ($ar in $areas) { if ($ar.dir -eq $mrow[2]) { $mk = $pulse[$ar.dir] } }
-        Write-Host "$AC   [$($mrow[0])]$R$FG $($mrow[1])$R$DIM  $($mrow[2].PadRight(11))$($mk.PadRight(4))$R$AC[$($mrow[3])]$R$FG $($mrow[4])$R"
+        $left = if ($mrow[0]) {
+            "$AC[$($mrow[0])]$R$FG $($mrow[1])$R$DIM  $($mrow[2].PadRight(11))$($mk.PadRight(3))$R"
+        } else { ' ' * 27 }
+        $rightStr = "$AC[$($mrow[3])]$R$FG $($mrow[4])$R"
+        if ($mrow[5]) {
+            $rmk = ''
+            foreach ($ar in $areas) { if ($ar.dir -eq $mrow[5]) { $rmk = " $($pulse[$ar.dir])" } }
+            $rightStr += "$DIM  $($mrow[5])$rmk$R"
+        }
+        Write-Host "   $left$rightStr"
     }
-    Write-Host ("$FG   " + (' ' * 28) + "$AC[w]$R$FG wired$R$DIM  ambient-monitor$R")
     Write-Host ""
     Write-Host "$DIM   ^ = neuer tab    alt+links/rechts = tab-switch$R"
     Write-Host ""
@@ -275,9 +250,7 @@ while ($true) {
         Write-Host ""
         $bk = "$OD\00_System\copland\backup\copland-backup.ps1"
         if (Test-Path $bk) { & $bk } else { Warn 'backup-skript nicht gefunden' }
-        Write-Host ""
-        Write-Host -NoNewline "$DIM  beliebige taste -> menue $R"
-        [void]$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        Wait-Back
         continue
     }
     if ("$k" -match '^[aA]$') {
@@ -337,117 +310,6 @@ while ($true) {
         $script:RainDrops.Clear()
         continue
     }
-    if ("$k" -match '^[iI]$') {
-        Clear-Host
-        Write-Host ""
-        Write-Host "$AC   STATUS$R"
-        Write-Host "$DIM   .....................................$R"
-        Write-Host ""
-
-        # zuletzt gearbeitet: wo tatsaechlich claude-sessions liefen
-        Write-Host "$DIM   zuletzt gearbeitet$R"
-        $map = [ordered]@{ '00-System'='system'; '10-uni'='uni'; '20-work'='work'; '30-venture'='venture'; '40-private'='private'; '50-career'='career' }
-        Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory |
-            Where-Object { $_.Name -match '^[Cc]--Users-marep-OneDrive-' } |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 7 | ForEach-Object {
-                $n = $_.Name -replace '^[Cc]--Users-marep-OneDrive-', ''
-                foreach ($ak in $map.Keys) {
-                    if ($n -like "$ak*") { $n = $map[$ak] + ($n.Substring($ak.Length) -replace '^-', '/'); break }
-                }
-                $lw = $_.LastWriteTime
-                $rel = if ($lw.Date -eq (Get-Date).Date) { 'heute' }
-                       elseif ($lw.Date -eq (Get-Date).Date.AddDays(-1)) { 'gestern' }
-                       else { "vor $([int]((Get-Date) - $lw).TotalDays)t" }
-                if ($n.Length -gt 30) { $n = $n.Substring(0, 29) + '~' }
-                Write-Host "$FG   $($n.PadRight(31))$R$DIM $rel$R"
-            }
-        Write-Host ""
-
-        # heatmap: aktivitaet pro tag, letzte 16 wochen (spalte = woche)
-        $act = Get-DayActivity 112
-        if ($act.Count -gt 0) {
-            Write-Host "$DIM   aktivitaet (16 wochen, . : + * #)$R"
-            $today = (Get-Date).Date
-            $monday = $today.AddDays(-(([int]$today.DayOfWeek + 6) % 7))
-            $hstart = $monday.AddDays(-15 * 7)
-            $names = 'mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'
-            for ($dw = 0; $dw -lt 7; $dw++) {
-                $line = ''
-                for ($wk = 0; $wk -lt 16; $wk++) {
-                    $d = $hstart.AddDays($wk * 7 + $dw)
-                    if ($d -gt $today) { $line += '  '; continue }
-                    $v = [int]$act[$d.ToString('yyyy-MM-dd')]
-                    $ch = if ($v -ge 7) { '#' } elseif ($v -ge 4) { '*' } elseif ($v -ge 2) { '+' } elseif ($v -ge 1) { ':' } else { '.' }
-                    $line += "$ch "
-                }
-                Write-Host "$DIM   $($names[$dw]) $R$FG$line$R"
-            }
-            Write-Host ""
-        }
-
-        # balance: wohin floss die woche? (balken = 7 tage, sparkline = 8 wochen)
-        $bal = Get-AreaBalance
-        $wk8 = Get-AreaWeekly
-        $balMax = ($bal.Values | Measure-Object -Maximum).Maximum
-        if ($balMax -gt 0) {
-            Write-Host "$DIM   balance (sessions 7 tage | verlauf 8 wochen)$R"
-            $wkMax = 0
-            foreach ($ba in $areas) { foreach ($v8 in $wk8[$ba.dir]) { if ($v8 -gt $wkMax) { $wkMax = $v8 } } }
-            foreach ($ba in $areas) {
-                $v = $bal[$ba.dir]
-                $f = [math]::Round($v / $balMax * 10)
-                $bc = ConvertTo-BrailleChart ([double[]]$wk8[$ba.dir]) 8 1 $wkMax
-                $spark = if ($bc) { $bc[0] } else {
-                    $s2 = ''
-                    foreach ($v8 in $wk8[$ba.dir]) {
-                        $s2 += if ($v8 -ge 6) { '#' } elseif ($v8 -ge 3) { '=' } elseif ($v8 -ge 1) { ':' } else { '.' }
-                    }
-                    $s2
-                }
-                Write-Host "$FG   $($ba.label.Trim().ToLower().PadRight(9))$R$DIM[$('=' * $f)$('.' * (10 - $f))] $v   $spark$R"
-            }
-            Write-Host ""
-        }
-
-        # meistgenutzte skills (eigene slash-commands, letzte 30 tage; builtins raus)
-        $hist = "$env:USERPROFILE\.claude\history.jsonl"
-        if (Test-Path $hist) {
-            $builtin = '^(compact|clear|model|config|effort|voice|mobile|workflows|resume|fast|tasks|help|init|doctor|login|logout|status|cost|memory)$'
-            $cut = [DateTimeOffset]::Now.AddDays(-30).ToUnixTimeMilliseconds()
-            $top = Get-Content $hist | ForEach-Object {
-                try { $j = $_ | ConvertFrom-Json } catch { return }
-                if ($j.timestamp -ge $cut -and "$($j.display)" -match '^/(\S+)') {
-                    if ($Matches[1] -notmatch $builtin) { $Matches[1] }
-                }
-            } | Group-Object | Sort-Object Count -Descending | Select-Object -First 5
-            if ($top) {
-                Write-Host "$DIM   meistgenutzte skills (30 tage)$R"
-                foreach ($t in $top) { Write-Host "$FG   /$($t.Name.PadRight(30))$R$DIM $($t.Count)x$R" }
-                Write-Host ""
-            }
-        }
-
-        # offene punkte je abschnitt
-        $op = "$OD\00_System\offene-punkte.md"
-        if (Test-Path $op) {
-            Write-Host "$DIM   offene punkte$R"
-            $sec = ''; $counts = [ordered]@{}
-            foreach ($line in Get-Content $op -Encoding utf8) {
-                if ($line -match '^##\s+(.*)') { $sec = $Matches[1].ToLower(); $counts[$sec] = 0 }
-                elseif ($sec -and $line -match '^\s*-\s') { $counts[$sec]++ }
-            }
-            foreach ($sk in $counts.Keys) {
-                $sn = "$sk"
-                if ($sn.Length -gt 30) { $sn = $sn.Substring(0, 29) + '~' }
-                Write-Host "$FG   $($sn.PadRight(31))$R$DIM $($counts[$sk]) punkte$R"
-            }
-        }
-
-        Write-Host ""
-        Write-Host -NoNewline "$DIM  beliebige taste -> menue $R"
-        [void]$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-        continue
-    }
     if ("$k" -match '^[hH]$') {
         # hub als dashboard: links bereiche/projekte, rechts verlauf + offen + skills
         Clear-Host
@@ -480,26 +342,24 @@ while ($true) {
             $RC.Add(@{ t = " $gls"; c = "$DIM $gls$R" })
         }
         $RC.Add(@{ t = ''; c = '' })
-        $op = "$OD\00_System\offene-punkte.md"
-        if (Test-Path $op) {
+        $opAll = Get-OffenePunkte
+        if ($opAll.Count) {
             $RC.Add(@{ t = 'OFFEN'; c = "${AC}OFFEN$R" })
-            $sec = ''; $counts = [ordered]@{}
-            foreach ($line in Get-Content $op -Encoding utf8) {
-                if ($line -match '^##\s+(.*)') { $sec = $Matches[1].ToLower(); $counts[$sec] = 0 }
-                elseif ($sec -and $line -match '^\s*-\s') { $counts[$sec]++ }
-            }
+            $counts = [ordered]@{}
+            foreach ($opi in $opAll) { $counts[$opi.sec.ToLower()] = [int]$counts[$opi.sec.ToLower()] + 1 }
             foreach ($sk2 in $counts.Keys) {
                 $sn = "$sk2"; if ($sn.Length -gt 34) { $sn = $sn.Substring(0, 33) + '~' }
                 $RC.Add(@{ t = " $($sn.PadRight(35))$($counts[$sk2])"; c = "$FG $($sn.PadRight(35))$R$DIM$($counts[$sk2])$R" })
             }
             $RC.Add(@{ t = ''; c = '' })
         }
-        $bal = Get-AreaBalance
-        $balMax = ($bal.Values | Measure-Object -Maximum).Maximum
+        $stats = Get-AreaStats
+        $balMax = 0
+        foreach ($ba in $areas) { if ($stats[$ba.dir].s7 -gt $balMax) { $balMax = $stats[$ba.dir].s7 } }
         if ($balMax -gt 0) {
             $RC.Add(@{ t = 'BALANCE'; c = "${AC}BALANCE$R" })
             foreach ($ba in $areas) {
-                $v = $bal[$ba.dir]
+                $v = $stats[$ba.dir].s7
                 $f = [math]::Round($v / $balMax * 10)
                 $bt = " $($ba.label.Trim().ToLower().PadRight(9))[$('=' * $f)$('.' * (10 - $f))] $v"
                 $RC.Add(@{ t = $bt; c = "$FG $($ba.label.Trim().ToLower().PadRight(9))$R$DIM[$('=' * $f)$('.' * (10 - $f))] $v$R" })
@@ -530,55 +390,15 @@ while ($true) {
             Write-Host "   $($cellL.c)$pad$DIM|$R  $($cellR.c)"
         }
         Write-Host ""
-        Write-Host -NoNewline "$DIM  [b] browser-version   beliebige taste -> menue $R"
-        $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
-        if ("$c" -match '^[bB]$') {
-            & "$OD\00_System\copland\copland-hub.ps1" | Out-Null
-            Start-Process "$OD\00_System\copland\hub.html"
-        }
-        continue
-    }
-    if ("$k" -match '^[uU]$') {
-        Clear-Host
-        Write-Host ""
-        Write-Host "$AC   USAGE$R$DIM  tokens pro tag, letzte 14 tage$R"
-        Write-Host ""
-        $cuOk = $false
-        if (Get-Command ccusage -ErrorAction SilentlyContinue) {
-            try {
-                $cuAll = @((ccusage daily --json 2>$null | ConvertFrom-Json).daily)
-                $cu = @($cuAll | Select-Object -Last 14)
-                $cuMax = ($cu | Measure-Object totalTokens -Maximum).Maximum
-                if ($cuMax -gt 0) {
-                    foreach ($cd in $cu) {
-                        $f = [math]::Round($cd.totalTokens / $cuMax * 24)
-                        $mt = [math]::Round($cd.totalTokens / 1e6, 1)
-                        $dstr = ([datetime]$cd.period).ToString('dd.MM.')
-                        Write-Host "$DIM   $dstr $R$FG[$('=' * $f)$('.' * (24 - $f))]$R$DIM $($mt)M tok | $([math]::Round($cd.totalCost)) usd$R"
-                    }
-                    # verlaufskurve (braille, 30 tage)
-                    $curve = @($cuAll | Select-Object -Last 30 | ForEach-Object { [double]$_.totalTokens })
-                    $bc = ConvertTo-BrailleChart $curve 32 4
-                    if ($bc) {
-                        Write-Host ""
-                        Write-Host "$DIM   verlauf 30 tage$R"
-                        foreach ($bl in $bc) { Write-Host "$AC   $bl$R" }
-                    }
-                    $cuOk = $true
-                }
-            } catch { }
-            if (-not $cuOk) { ccusage }
-        } else { Warn 'ccusage nicht gefunden' }
-        Write-Host ""
-        Write-Host -NoNewline "$DIM  [d] voller report   beliebige taste -> menue $R"
-        $cuk = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
-        if ("$cuk" -match '^[dD]$') {
-            Clear-Host
-            Write-Host ""
-            ccusage
-            Write-Host ""
-            Write-Host -NoNewline "$DIM  beliebige taste -> menue $R"
-            [void]$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        Write-Host -NoNewline "$DIM  [b] browser   [z] zurueck $R"
+        while ($true) {
+            $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
+            if ("$c" -match '^[bB]$') {
+                & "$OD\00_System\copland\copland-hub.ps1" | Out-Null
+                Start-Process "$OD\00_System\copland\hub.html"
+                break
+            }
+            if ("$c" -match '^[zZ]$') { break }
         }
         continue
     }
@@ -587,12 +407,10 @@ while ($true) {
         Get-Content "$OD\00_System\copland\manual.md" | ForEach-Object {
             if ($_ -match '^[A-Z]') { Write-Host "$AC$_$R" } else { Write-Host "$FG$_$R" }
         }
-        Write-Host ""
-        Write-Host -NoNewline "$DIM  beliebige taste -> menue $R"
-        [void]$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        Wait-Back
         continue
     }
-    if ($k -eq '7') {
+    if ("$k" -match '^[67]$') {
         $wdir = "$OD\00_System\werkstatt"
         while ($true) {
             Clear-Host
@@ -669,7 +487,9 @@ while ($true) {
         }
         $heuteAktiv = @($cards | Where-Object { $_.rel -eq 'heute' }).Count
 
+        # direktstart: ziffer/enter startet SOFORT (modus vorher per praefix r/s/c waehlbar)
         $target = $null
+        $mode = 'new'
         while ($true) {
             Clear-Host
             Write-Host ""
@@ -684,11 +504,16 @@ while ($true) {
                 $i++
             }
             if ($projs) { Write-Host "" }
-            Write-Host "$DIM   [enter] ganzer bereich    [n] neues projekt    [z] zurueck$R"
+            $modeLbl = switch ($mode) { 'continue' { 'letzte' } 'resume' { 'liste' } 'codex' { 'codex' } default { 'claude neu' } }
+            Write-Host "$DIM   [1-9] projekt starten    [enter] ganzer bereich    [n] neues projekt$R"
+            Write-Host "$DIM   modus: $R$AC$modeLbl$R$DIM  (aendern: [r] letzte [s] liste [c] codex)    [z] zurueck$R"
             Write-Host -NoNewline "$AC   > $R"
             $pk = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             Write-Host ""
             if ("$pk" -match '^[zZ]$') { break }
+            if ("$pk" -match '^[rR]$') { $mode = 'continue'; continue }
+            if ("$pk" -match '^[sS]$') { $mode = 'resume'; continue }
+            if ("$pk" -match '^[cC]$') { $mode = 'codex'; continue }
             if ($pk -eq [char]13) { $target = $base; break }
             if ("$pk" -match '^[1-9]$') {
                 $idx = [int]"$pk" - 1
@@ -709,7 +534,8 @@ while ($true) {
                         @(
                             "# $pname -- Projektkontext"
                             ""
-                            "Bereich: $($sel.label.Trim()). Angelegt: $(Get-Date -Format 'yyyy-MM-dd')."
+                            "Bereich: $($sel.label.Trim()) | status: aktiv | alias: $pname"
+                            "Angelegt: $(Get-Date -Format 'yyyy-MM-dd')."
                             ""
                             "## Zweck"
                             "(in der ersten session fuellen)"
@@ -721,30 +547,13 @@ while ($true) {
                             "- diese datei aktuell halten: nach jeder session Stand kurz ergaenzen"
                         ) | Set-Content $cmd -Encoding utf8
                     }
+                    $mode = 'new'
                     break
                 }
             }
             # jede andere taste: menue neu zeichnen, nichts passiert stillschweigend
         }
         if (-not $target) { continue }
-
-        # --- session-menue: enter/r/s/c starten, z zurueck, alles andere wird ignoriert ---
-        $mode = $null
-        while ($true) {
-            Clear-Host
-            Write-Host ""
-            Write-Host "$DIM  copland: verbinde -> $(Split-Path $target -Leaf)$R"
-            Write-Host ""
-            Write-Host "$AC   [enter]$R$FG claude neu$R$DIM    [r] letzte    [s] session-liste    [c] chatgpt    [z] zurueck$R"
-            Write-Host -NoNewline "$AC   > $R"
-            $m = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
-            Write-Host ""
-            if ("$m" -match '^[zZ]$') { break }
-            if ($m -eq [char]13)     { $mode = 'new'; break }
-            if ("$m" -match '^[rR]$') { $mode = 'continue'; break }
-            if ("$m" -match '^[sS]$') { $mode = 'resume'; break }
-            if ("$m" -match '^[cC]$') { $mode = 'codex'; break }
-        }
-        if ($mode) { Start-Claude $target $mode $sel.label.Trim().ToLower() }
+        Start-Claude $target $mode $sel.label.Trim().ToLower()
     }
 }

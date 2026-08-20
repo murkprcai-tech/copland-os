@@ -7,10 +7,12 @@ WAS DU HIER KANNST
   tag planen: termine, mails, fristen ... [a]  oder  /briefing
   stand der session festhalten .......... /merken
   input ins wissenssystem einarbeiten ... /einarbeiten
-  dokument bauen und als pdf ansehen .... [7] werkstatt
+  dokument bauen und als pdf ansehen .... [6] werkstatt
   alles auf einen blick ................. [h] terminal, darin [b] browser
-  limits und token nachsehen ............ [u]  oder  /usage
+  limits und token nachsehen ............ panel rechts (alt+g = grafik)
+  copland von ueberall nach vorn holen .. win+` (quake-mode)
   diktieren statt tippen ................ /voice, dann leertaste halten
+  schnell in einen ordner springen ...... z <name> in der shell (zoxide)
 
 LAUNCHER
   startseite: digital rain unten rechts, laeuft bis tastendruck.
@@ -22,33 +24,30 @@ LAUNCHER -- HINGEHEN
            puls hinter dem bereich: ** heute, * gestern, . woche
   [s]      systemraum 00_System (gespraeche ueber die umgebung)
   [a]      alltag: assistent-ordner, startet direkt mit /briefing
-  [7]      werkstatt: dokumente listen, ziffer oeffnet die datei
+  [6]      werkstatt: dokumente listen, ziffer oeffnet die datei
            [i] browser-uebersicht   [e] explorer   [z] zurueck
   [0]      shell ohne claude
   [o]      lokale ki ohne internet (ollama)
            [enter] gpt-oss 20b   [2] qwen3 14b   [3] gemma3 12b (bilder)
 
 LAUNCHER -- NACHSEHEN
-  [i]      status: zuletzt gearbeitet, heatmap (16 wochen), balance
-           mit 8-wochen-sparklines, skills, offene punkte je abschnitt
-  [h]      hub: alle bereiche und projekte im terminal (zweck/stand aus
-           den CLAUDE.mds) + git-verlauf. [b] darin oeffnet die
-           kommandozentrale im browser: gauges, donut, heatmap,
-           lebens-graph, commit-timeline, projekt-karten
-  [u]      usage: token-chart der letzten 14 tage, [d] voller report
+  [h]      hub, der EINE uebersichts-screen: bereiche/projekte mit
+           stand, git-verlauf, offene punkte, balance, skills.
+           [b] darin oeffnet die kommandozentrale im browser
+           (gauges, donut, heatmap, lebens-graph, timeline)
   [w]      wired: vollbild-ambient (uhr, limits, rain), jede taste beendet
-  [i]/[h]  zeigen beide die balance: sessions je bereich, 7 tage
+  token-charts: panel seite 2 (alt+g) und browser-hub
 
 LAUNCHER -- REST
   [b] config-backup     [m] dieses manual      [q] beenden
 
-SESSION STARTEN
-  nach der bereichswahl (die karte zeigt je projekt aktivitaet + stand):
+SESSION STARTEN (direktstart: zwei tasten statt vier)
+  nach der bereichswahl (karte zeigt je projekt aktivitaet + stand):
+  [1]-[9]  projekt -- startet SOFORT claude neu
   [enter]  ganzer bereich          [n]  neues projekt (ordner + CLAUDE.md)
-  [1]-[9]  projekt-unterordner (alphabetisch)
-  dann:
-  [enter]  claude, neue session    [s]  session-liste (wie /resume)
-  [r]      letzte fortsetzen       [c]  chatgpt/codex
+  anderer modus? VORHER als praefix druecken, dann die ziffer:
+  [r] letzte fortsetzen   [s] session-liste   [c] chatgpt/codex
+  die fusszeile zeigt den gewaehlten modus, [z] geht zurueck
 
 SKILLS -- TAEGLICH
   /rat           frage parallel an mehrere kis (claude, codex, freie
@@ -78,7 +77,14 @@ TABS (der kern-workflow)
   ^ (taste unter esc)   neuer tab mit auswahlmenue
   alt+rechts/links      zwischen tabs switchen
   ctrl+shift+w          pane/tab schliessen
+  win+`                 copland von ueberall einblenden (quake-mode)
   tab-titel = bereich/projekt, terminal startet maximiert
+
+SHELL-TOOLS (in [0] und jeder powershell)
+  z <name>     zoxide: springt in bekannte ordner (lernt mit)
+  ctrl+r       fzf: fuzzy-suche in der befehls-historie
+  ctrl+t       fzf: fuzzy-dateisuche im aktuellen ordner
+  tippen       psreadline: gedimmte auto-vorschlaege aus der historie
 
 PANEL (rechts, laeuft in jedem tab mit, refresh 60s, [q] schliesst)
   zwei seiten, wechsel mit pfeiltasten (oder g / alt+g von ueberall):
@@ -87,8 +93,9 @@ PANEL (rechts, laeuft in jedem tab mit, refresh 60s, [q] schliesst)
   5h- und 7d-limit als balken mit reset-zeit, rot ab 80%
   darunter das modell-eigene wochenfenster von der usage-api (cache 5min)
   unterm 5h-balken: burn-kurve der letzten ~30 min (braille)
-  rat-block: tagesverbrauch der freien stimmen, je stimme ein balken,
-  erscheint sobald der api-key gesetzt ist
+  rat-block: nur stimmen, die heute benutzt wurden (sonst eine zeile);
+  release-hinweis nur, wenn ein claude-code-update aussteht;
+  burn-kurve erst ab 40% des 5h-fensters (schwellwert-prinzip)
   ki-dienste: stoerungen von anthropic/openai nur im stoerfall in rot,
   still darunter die neuesten versionen (cc x.y | codex x.y)
   ausserdem: uhr, datum, wetter, ort der letzten session, modell + ctx

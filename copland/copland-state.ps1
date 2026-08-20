@@ -25,14 +25,12 @@ $areas = @(
     @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '00_System' }
 )
 
-# session-aktivitaet je projekt-pfad (aus ~\.claude\projects)
+# session-aktivitaet aus dem gemeinsamen index (copland-shared.ps1, EIN scan)
+. "$OD\00_System\copland\copland-shared.ps1"
+$idx = Get-CoplandIndex -Force
 $sess = @{}
-Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
-    $files = @(Get-ChildItem $_.FullName -File -Filter *.jsonl)
-    if (-not $files) { return }
-    $newest = ($files | Sort-Object LastWriteTime -Descending)[0].LastWriteTime
-    $s30 = @($files | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-30) }).Count
-    $sess[$_.Name.ToLower()] = @{ newest = $newest; s30 = $s30 }
+foreach ($prop in $idx.sessions.PSObject.Properties) {
+    $sess[$prop.Name] = @{ newest = [datetime]$prop.Value.newest; s30 = [int]$prop.Value.s30 }
 }
 
 $L = New-Object System.Collections.Generic.List[string]

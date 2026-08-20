@@ -49,6 +49,7 @@ if (-not $rel) { $rel = 'OneDrive' }
     dir       = $rel
     five_hour = $j.rate_limits.five_hour
     seven_day = $j.rate_limits.seven_day
+    ccv       = $j.version
     ts        = [DateTimeOffset]::Now.ToUnixTimeSeconds()
 } | ConvertTo-Json -Compress | Set-Content "$env:LOCALAPPDATA\copland-limits.json" -Encoding utf8
 
