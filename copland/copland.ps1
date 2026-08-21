@@ -3,10 +3,9 @@
 # workflow: menue -> bereich -> session | ^ = neuer tab | alt+links/rechts = tab-switch
 
 $ErrorActionPreference = 'SilentlyContinue'
-$OD = "$env:USERPROFILE\OneDrive"
 
-# Farben (kaltes Blaugrau) -- gemeinsam mit dem panel
-. "$OD\00_System\copland\copland-shared.ps1"
+# Farben + plattform ($OD, $IsWin, $PSExe) -- gemeinsam mit dem panel
+. "$PSScriptRoot\copland-shared.ps1"
 
 # kurze warnung im copland-ton -- fehler sollen hoerbar sein, nicht stumm versickern
 function Warn([string]$msg) {
@@ -80,7 +79,8 @@ if ($env:WT_SESSION -and -not $env:COPLAND_NO_PANEL) {
 }
 
 # STATE.md aktualisieren (eigener prozess, staleness-guard macht es billig)
-Start-Process -WindowStyle Hidden powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$OD\00_System\copland\copland-state.ps1"
+if ($IsWin) { Start-Process -WindowStyle Hidden powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$OD\00_System\copland\copland-state.ps1" }
+else        { Start-Process $PSExe -ArgumentList '-NoProfile', '-File', "$OD/00_System/copland/copland-state.ps1" }
 
 # ziffer = ordner-dekade (1=10, 2=20, ...), [s] = systemraum
 $areas = @(
@@ -395,7 +395,7 @@ while ($true) {
             $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             if ("$c" -match '^[bB]$') {
                 & "$OD\00_System\copland\copland-hub.ps1" | Out-Null
-                Start-Process "$OD\00_System\copland\hub.html"
+                Open-Item "$OD\00_System\copland\hub.html"
                 break
             }
             if ("$c" -match '^[zZ]$') { break }
@@ -437,11 +437,11 @@ while ($true) {
             Write-Host -NoNewline "$AC   > $R"
             $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             if ("$c" -match '^[zZ]$') { break }
-            if ("$c" -match '^[iI]$') { Start-Process "$wdir\INDEX.html"; continue }
-            if ("$c" -match '^[eE]$') { Start-Process explorer $wdir; continue }
+            if ("$c" -match '^[iI]$') { Open-Item "$wdir\INDEX.html"; continue }
+            if ("$c" -match '^[eE]$') { if ($IsWin) { Start-Process explorer $wdir } else { Open-Item $wdir }; continue }
             if ("$c" -match '^[1-9]$') {
                 $idx = [int]"$c" - 1
-                if ($files -and $idx -lt $files.Count) { Start-Process $files[$idx].FullName }
+                if ($files -and $idx -lt $files.Count) { Open-Item $files[$idx].FullName }
             }
         }
         continue

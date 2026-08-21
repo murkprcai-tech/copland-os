@@ -8,7 +8,7 @@ $Cache = "$env:LOCALAPPDATA\copland-limits.json"
 $SDir  = "$env:LOCALAPPDATA\copland-sessions"
 
 # farben gemeinsam mit dem launcher
-. "$env:USERPROFILE\OneDrive\00_System\copland\copland-shared.ps1"
+. "$PSScriptRoot\copland-shared.ps1"
 
 $SEPLINE = "$DIM  .....................$R"
 
@@ -522,12 +522,18 @@ while ($true) {
     }
 
     # --- system-einzeiler ---
-    $freeGB = [math]::Round((Get-PSDrive C).Free / 1GB)
-    $os = Get-CimInstance Win32_OperatingSystem
-    $ram = [math]::Round(100 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize * 100))
+    if ($IsWin) {
+        $freeGB = [math]::Round((Get-PSDrive C).Free / 1GB)
+        $os = Get-CimInstance Win32_OperatingSystem
+        $ram = [math]::Round(100 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize * 100))
+        $sysLine = "c: $freeGB gb frei | ram $ram%"
+    } else {
+        $freeGB = [math]::Round((New-Object IO.DriveInfo '/').AvailableFreeSpace / 1GB)
+        $sysLine = "/: $freeGB gb frei"
+    }
     Write-Host $SEPLINE
     Write-Host ""
-    Write-Host "$DIM  c: $freeGB gb frei | ram $ram%$R"
+    Write-Host "$DIM  $sysLine$R"
 
     # --- ki-dienste: stoerungen nur wenn etwas klemmt, releases als stille zeile ---
     if ($aiData) {

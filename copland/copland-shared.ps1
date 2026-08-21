@@ -14,6 +14,26 @@ $DIM  = "$E[38;2;74;88;102m"     # gedimmt
 $WARN = "$E[38;2;194;132;143m"   # warnung
 $R    = "$E[0m"
 
+# --- plattform ---------------------------------------------------------------
+# windows = primaer (powershell 5.1, windows terminal). macos/linux via pwsh =
+# experimentell. COPLAND_ROOT = ordner mit den bereichen (00_System, 10_uni, ...);
+# default: ~\OneDrive. fehlende windows-variablen werden fuer unix nachgebildet.
+$IsWin = ($env:OS -eq 'Windows_NT')
+if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
+if (-not $env:LOCALAPPDATA) {
+    $env:LOCALAPPDATA = Join-Path $HOME '.cache/copland'
+    $null = New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA
+}
+if (-not $env:TEMP) { $env:TEMP = [IO.Path]::GetTempPath().TrimEnd('/', '\') }
+$OD    = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
+$PSExe = if ($IsWin) { 'powershell' } else { 'pwsh' }
+# datei/url mit dem systemstandard oeffnen (explorer / open / xdg-open)
+function Open-Item([string]$p) {
+    if ($IsWin) { Start-Process $p }
+    elseif (Get-Command open -ErrorAction SilentlyContinue) { & open $p }
+    else { & xdg-open $p }
+}
+
 # ascii-balken: anteil $p (0-100) auf breite $w
 function Bar([double]$p, [int]$w) {
     $f = [math]::Round($p / 100 * $w)
@@ -29,7 +49,7 @@ function Get-ActivityLevel([int]$v) {
 
 # offene-punkte.md parsen: liste aus @{sec; text}
 function Get-OffenePunkte {
-    $op = "$env:USERPROFILE\OneDrive\00_System\offene-punkte.md"
+    $op = "$OD\00_System\offene-punkte.md"
     $out = @()
     if (Test-Path $op) {
         $sec = ''

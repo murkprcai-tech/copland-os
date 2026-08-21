@@ -5,7 +5,8 @@
 # aufruf: [h] -> [b] im launcher. 40_private: nur ordnernamen (ausser assistent).
 
 $ErrorActionPreference = 'SilentlyContinue'
-$OD  = "$env:USERPROFILE\OneDrive"
+if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
+$OD  = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
 $out = "$OD\00_System\copland\hub.html"
 
 $areas = @(

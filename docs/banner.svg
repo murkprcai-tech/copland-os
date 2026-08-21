@@ -1,50 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280" font-family="'Departure Mono','Iosevka Term','JetBrains Mono',Consolas,'Courier New',monospace">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="200" viewBox="0 0 1200 200" font-family="'Departure Mono','Iosevka Term','JetBrains Mono',Consolas,'Courier New',monospace">
   <style>
-    .fg{fill:#B8C4CE}.ac{fill:#8CABC6}.dim{fill:#4A5866}.mute{fill:#1C232A}
-    .t{font-size:22px;letter-spacing:2px}
+    .fg{fill:#B8C4CE}.ac{fill:#8CABC6}.dim{fill:#4A5866}
+    .t{font-size:26px;letter-spacing:3px}
     .s{font-size:17px;letter-spacing:1px}
-    .r{font-size:14px}
     #title-clip rect{animation:type 1.6s steps(10,end) .4s both}
-    @keyframes type{from{width:0}to{width:270px}}
+    @keyframes type{from{width:0}to{width:330px}}
     #sub{animation:fade .01s 2.3s both}
     @keyframes fade{from{opacity:0}to{opacity:1}}
     #cur{animation:blink 1s steps(1,end) 2.3s infinite}
     @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
-    #menu{animation:fade .01s 3.0s both}
-    #prompt{animation:fade .01s 3.4s both}
-    .rain text{animation:fall linear infinite}
-    @keyframes fall{from{transform:translateY(-340px)}to{transform:translateY(300px)}}
-    .c1{animation-duration:13s!important}.c2{animation-duration:17s!important;animation-delay:-6s!important}
-    .c3{animation-duration:11s!important;animation-delay:-3s!important}.c4{animation-duration:19s!important;animation-delay:-9s!important}
-    .c5{animation-duration:15s!important;animation-delay:-12s!important}.c6{animation-duration:12s!important;animation-delay:-5s!important}
-    .c7{animation-duration:21s!important;animation-delay:-2s!important}
   </style>
-  <rect width="1200" height="280" fill="#000000"/>
-
-  <!-- digital rain, right half, barely there -->
-  <g class="rain r mute">
-    <text class="c1" y="0"><tspan x="760" dy="16">*</tspan><tspan x="760" dy="16">+</tspan><tspan x="760" dy="16">.</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">#</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">*</tspan><tspan x="760" dy="16">#</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">#</tspan><tspan x="760" dy="16">+</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">.</tspan><tspan x="760" dy="16">.</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">+</tspan><tspan x="760" dy="16">:</tspan><tspan x="760" dy="16">#</tspan></text>
-    <text class="c2" y="0"><tspan x="820" dy="16">.</tspan><tspan x="820" dy="16">:</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">:</tspan><tspan x="820" dy="16">+</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">:</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">.</tspan><tspan x="820" dy="16">:</tspan><tspan x="820" dy="16">+</tspan><tspan x="820" dy="16">:</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">+</tspan><tspan x="820" dy="16">*</tspan><tspan x="820" dy="16">.</tspan><tspan x="820" dy="16">+</tspan><tspan x="820" dy="16">#</tspan><tspan x="820" dy="16">:</tspan></text>
-    <text class="c3" y="0"><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">*</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">+</tspan><tspan x="880" dy="16">:</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">+</tspan><tspan x="880" dy="16">*</tspan><tspan x="880" dy="16">:</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">:</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">:</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">+</tspan><tspan x="880" dy="16">.</tspan><tspan x="880" dy="16">#</tspan><tspan x="880" dy="16">.</tspan><tspan x="880" dy="16">*</tspan></text>
-    <text class="c4" y="0"><tspan x="940" dy="16">.</tspan><tspan x="940" dy="16">#</tspan><tspan x="940" dy="16">.</tspan><tspan x="940" dy="16">*</tspan><tspan x="940" dy="16">*</tspan><tspan x="940" dy="16">+</tspan><tspan x="940" dy="16">+</tspan><tspan x="940" dy="16">+</tspan><tspan x="940" dy="16">:</tspan><tspan x="940" dy="16">#</tspan><tspan x="940" dy="16">*</tspan><tspan x="940" dy="16">#</tspan><tspan x="940" dy="16">.</tspan><tspan x="940" dy="16">*</tspan><tspan x="940" dy="16">.</tspan><tspan x="940" dy="16">*</tspan><tspan x="940" dy="16">#</tspan><tspan x="940" dy="16">:</tspan><tspan x="940" dy="16">:</tspan><tspan x="940" dy="16">#</tspan></text>
-    <text class="c5" y="0"><tspan x="1000" dy="16">.</tspan><tspan x="1000" dy="16">+</tspan><tspan x="1000" dy="16">*</tspan><tspan x="1000" dy="16">+</tspan><tspan x="1000" dy="16">.</tspan><tspan x="1000" dy="16">.</tspan><tspan x="1000" dy="16">:</tspan><tspan x="1000" dy="16">:</tspan><tspan x="1000" dy="16">#</tspan><tspan x="1000" dy="16">#</tspan><tspan x="1000" dy="16">*</tspan><tspan x="1000" dy="16">*</tspan><tspan x="1000" dy="16">*</tspan><tspan x="1000" dy="16">#</tspan><tspan x="1000" dy="16">.</tspan><tspan x="1000" dy="16">#</tspan><tspan x="1000" dy="16">.</tspan><tspan x="1000" dy="16">:</tspan><tspan x="1000" dy="16">:</tspan><tspan x="1000" dy="16">*</tspan></text>
-    <text class="c6" y="0"><tspan x="1060" dy="16">.</tspan><tspan x="1060" dy="16">:</tspan><tspan x="1060" dy="16">:</tspan><tspan x="1060" dy="16">*</tspan><tspan x="1060" dy="16">#</tspan><tspan x="1060" dy="16">.</tspan><tspan x="1060" dy="16">*</tspan><tspan x="1060" dy="16">.</tspan><tspan x="1060" dy="16">*</tspan><tspan x="1060" dy="16">:</tspan><tspan x="1060" dy="16">.</tspan><tspan x="1060" dy="16">*</tspan><tspan x="1060" dy="16">+</tspan><tspan x="1060" dy="16">#</tspan><tspan x="1060" dy="16">:</tspan><tspan x="1060" dy="16">.</tspan><tspan x="1060" dy="16">:</tspan><tspan x="1060" dy="16">+</tspan><tspan x="1060" dy="16">*</tspan><tspan x="1060" dy="16">+</tspan></text>
-    <text class="c7" y="0"><tspan x="1120" dy="16">+</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">:</tspan><tspan x="1120" dy="16">+</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">#</tspan><tspan x="1120" dy="16">*</tspan><tspan x="1120" dy="16">+</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">#</tspan><tspan x="1120" dy="16">*</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">*</tspan><tspan x="1120" dy="16">.</tspan><tspan x="1120" dy="16">+</tspan><tspan x="1120" dy="16">+</tspan><tspan x="1120" dy="16">:</tspan></text>
-  </g>
-
-  <!-- dotted rules -->
-  <text class="dim s" x="60" y="56">. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</text>
-  <text class="dim s" x="60" y="170">. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</text>
-
-  <!-- title, typed -->
-  <clipPath id="title-clip"><rect x="60" y="80" width="270" height="40"/></clipPath>
-  <text class="fg t" x="60" y="108" clip-path="url(#title-clip)">COPLAND OS</text>
-  <text id="sub" class="dim s" x="60" y="140">present day. present time.<tspan id="cur" class="ac">_</tspan></text>
-
-  <!-- menu echo -->
-  <g id="menu" class="s">
-    <text x="60" y="210"><tspan class="fg">[0] shell</tspan><tspan class="dim" dx="16">powershell</tspan><tspan class="fg" dx="40">[a] ALLTAG</tspan><tspan class="dim" dx="16">briefing</tspan></text>
-    <text x="60" y="236"><tspan class="fg">[1] UNI</tspan><tspan class="dim" dx="36">10_uni</tspan><tspan class="ac" dx="24">.</tspan><tspan class="fg" dx="44">[s] SYSTEM</tspan><tspan class="dim" dx="16">00_System</tspan><tspan class="ac" dx="12">**</tspan></text>
-  </g>
-  <text id="prompt" class="ac s" x="60" y="268">&gt;</text>
+  <rect width="1200" height="200" fill="#000000"/>
+  <text class="dim s" x="60" y="52">. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</text>
+  <clipPath id="title-clip"><rect x="60" y="74" width="330" height="44"/></clipPath>
+  <text class="fg t" x="60" y="106" clip-path="url(#title-clip)">COPLAND OS</text>
+  <text id="sub" class="dim s" x="60" y="138">present day. present time.<tspan id="cur" class="ac">_</tspan></text>
+  <text class="dim s" x="60" y="172">. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</text>
 </svg>

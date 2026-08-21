@@ -36,7 +36,8 @@ $model = "$model".ToLower()
 $ctx = $null
 if ($null -ne $j.context_window.used_percentage) { $ctx = [math]::Round($j.context_window.used_percentage) }
 
-$od = "$env:USERPROFILE\OneDrive"
+if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
+$od = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
 $rel = $dir
 if ($dir -like "$od*") { $rel = $dir.Substring($od.Length).TrimStart('\') }
 if (-not $rel) { $rel = 'OneDrive' }

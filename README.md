@@ -2,9 +2,11 @@
 
 > present day. present time.
 
-A terminal-centered personal operating environment for working with AI assistants,
-inspired by the aesthetics of *Serial Experiments Lain*: pure black, cold blue-gray,
-pure ASCII, function over decoration.
+A terminal-centered personal operating environment for working with AI assistants.
+Pure black, cold blue-gray, pure ASCII, function over decoration.
+
+The name and the look come from *Serial Experiments Lain* (1998): Copland OS is the
+operating system on Lain's Navi. This is a homage, not an affiliation.
 
 Built by **Marko Piric**.
 
@@ -54,22 +56,33 @@ Everything is plain files: folders are life areas, each project carries a `CLAUD
 a generator folds all of them into one `STATE.md`, and the AI reads that single file
 to know where you are. No database, no daemon, no framework.
 
+## Skills (built in)
+
+Three Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skills/`:
+
+| skill | what it does |
+|---|---|
+| `/briefing` | calendar, mails that need action, deadlines, open items, last work -- one screen |
+| `/dual` | same task to Claude and Codex (GPT) in parallel, one synthesised answer |
+| `/council` | same question to Claude, GPT, Nemotron, Llama, Qwen -- synthesis + where they disagree (free tiers) |
+
 ## Requirements
 
 - Windows 11, Windows Terminal >= 1.22 (sixel), PowerShell 5.1+
+- or macOS with `pwsh` 7 + WezTerm/iTerm2 -- `bash setup/macos.sh` (experimental, see [SETUP.md](SETUP.md))
 - [Claude Code](https://claude.com/claude-code) (and optionally the Codex CLI)
 - Font: [Departure Mono](https://departuremono.com/) (or any mono font you like)
 - Optional: `ccusage` (npm) for token charts, [Sixel](https://www.powershellgallery.com/packages/Sixel)
   PowerShell module, Ollama for offline models
 
-macOS: the scripts are PowerShell -- they run under `pwsh` with a sixel-capable
-terminal (iTerm2/WezTerm), but path handling is Windows-first; expect to adapt.
+Root folder defaults to `~/OneDrive`; set `COPLAND_ROOT` for anything else.
 See [SETUP.md](SETUP.md).
 
 ## Repository layout
 
     copland/   launcher, panel, state/hub generators, council helper, manual
-    claude/    statusline scripts + Claude Code color theme
+    claude/    statusline scripts, Claude Code color theme, skills/ (briefing, dual, council)
+    setup/     macos.sh + wezterm.lua
     docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
 
 ## License
