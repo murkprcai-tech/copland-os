@@ -1,14 +1,15 @@
 # COPLAND OS -- Panel (rechts, reine anzeige)
 # grosse uhr + ort + claude (modell/ctx/limits) + codex + system
-# daten: %LOCALAPPDATA%\copland-limits.json + copland-sessions\*.json
+# daten: <cache>/copland-limits.json + copland-sessions/*.json
+# (cache = %LOCALAPPDATA% auf windows, ~/.cache/copland auf macos/linux)
 # refresh: 60s. [q] schliesst.
 
 $ErrorActionPreference = 'SilentlyContinue'
-$Cache = "$env:LOCALAPPDATA\copland-limits.json"
-$SDir  = "$env:LOCALAPPDATA\copland-sessions"
 
-# farben gemeinsam mit dem launcher
-. "$PSScriptRoot\copland-shared.ps1"
+# farben + plattform gemeinsam mit dem launcher
+. (Join-Path $PSScriptRoot 'copland-shared.ps1')
+$Cache = Join-Path $CacheDir 'copland-limits.json'
+$SDir  = Join-Path $CacheDir 'copland-sessions'
 
 $SEPLINE = "$DIM  .....................$R"
 
@@ -61,7 +62,7 @@ $hist = New-Object System.Collections.Generic.List[object]
 
 # wetter (wttr.in, standort per ip): gemeinsamer datei-cache fuer alle panels,
 # refresh 30 min, fehlversuche fruehestens nach 5 min wiederholen, faellt still aus
-$wxFile = "$env:LOCALAPPDATA\copland-wx.txt"
+$wxFile = Join-Path $CacheDir 'copland-wx.txt'
 $wxTry  = Get-Date '2000-01-01'
 
 # codex-limits nur neu parsen, wenn sich das session-log geaendert hat
@@ -70,18 +71,19 @@ $cxRL   = $null
 
 # usage-api (modell-spezifische limits, z.b. fable-wochenfenster):
 # datei-cache 5 min, fehlversuche fruehestens nach 2 min, faellt still aus
-$usFile = "$env:LOCALAPPDATA\copland-usage.json"
+$usFile = Join-Path $CacheDir 'copland-usage.json'
 $usTry  = Get-Date '2000-01-01'
 
 # ki-status (stoerungen anthropic/openai) + neueste releases (claude code, codex):
 # datei-cache 15 min, fehlversuche fruehestens nach 5 min, faellt still aus
-$aiFile = "$env:LOCALAPPDATA\copland-ai-status.json"
+$aiFile = Join-Path $CacheDir 'copland-ai-status.json'
 $aiTry  = Get-Date '2000-01-01'
 
 # sixel-minicharts (token-kurve 30d + aktivitaets-heatmap): stuendlich neu gebaut,
-# faellt still aus, wenn das sixel-modul fehlt oder ccusage nicht antwortet
+# faellt still aus, wenn das sixel-modul fehlt oder ccusage nicht antwortet.
+# system.drawing gibt es nur auf windows -> auf macos/linux bleibt die grafikseite leer
 $SixelOn = $false
-try { Import-Module Sixel -ErrorAction Stop; Add-Type -AssemblyName System.Drawing; $SixelOn = $true } catch { }
+if ($IsWin) { try { Import-Module Sixel -ErrorAction Stop; Add-Type -AssemblyName System.Drawing; $SixelOn = $true } catch { } }
 $sxTs = Get-Date '2000-01-01'
 $sxChart = $null
 $sxHeat  = $null
@@ -110,7 +112,7 @@ while ($true) {
     if ($usStale -and ((Get-Date) - $usTry).TotalMinutes -ge 2) {
         $usTry = Get-Date
         try {
-            $tok = (Get-Content "$env:USERPROFILE\.claude\.credentials.json" -Raw | ConvertFrom-Json).claudeAiOauth.accessToken
+            $tok = Get-ClaudeToken
             if ($tok) {
                 $usResp = Invoke-RestMethod 'https://api.anthropic.com/api/oauth/usage' `
                     -Headers @{ Authorization = "Bearer $tok"; 'anthropic-beta' = 'oauth-2025-04-20' } -TimeoutSec 8
@@ -173,7 +175,7 @@ while ($true) {
                 }
                 $g.DrawLines((New-Object System.Drawing.Pen($acC, 2)), $pC)
                 $g.Dispose()
-                $tmp = "$env:TEMP\copland-panel-usage.png"
+                $tmp = Join-Path $env:TEMP 'copland-panel-usage.png'
                 $bmp.Save($tmp, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
                 $sxChart = ConvertTo-Sixel -Path $tmp -Width 18
             }
@@ -213,7 +215,7 @@ while ($true) {
                         $leg += "$k2 $([math]::Round($frac * 100))%"
                     }
                     $g3.Dispose()
-                    $tmp3 = "$env:TEMP\copland-panel-models.png"
+                    $tmp3 = Join-Path $env:TEMP 'copland-panel-models.png'
                     $bmp3.Save($tmp3, [System.Drawing.Imaging.ImageFormat]::Png); $bmp3.Dispose()
                     $sxModel = ConvertTo-Sixel -Path $tmp3 -Width 18
                     $sxModelLegend = $leg -join '  '
@@ -221,7 +223,7 @@ while ($true) {
             }
             # aktivitaets-heatmap 16 wochen x 7 tage
             $act = @{}
-            Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
+            Get-ChildItem (Join-Path $ClaudeHome 'projects') -Directory | ForEach-Object {
                 Get-ChildItem $_.FullName -File -Filter *.jsonl | ForEach-Object {
                     if ($_.LastWriteTime -gt (Get-Date).AddDays(-112)) {
                         $dk = $_.LastWriteTime.Date.ToString('yyyy-MM-dd')
@@ -254,7 +256,7 @@ while ($true) {
                 }
             }
             $g2.Dispose()
-            $tmp2 = "$env:TEMP\copland-panel-heat.png"
+            $tmp2 = Join-Path $env:TEMP 'copland-panel-heat.png'
             $bmp2.Save($tmp2, [System.Drawing.Imaging.ImageFormat]::Png); $bmp2.Dispose()
             $sxHeat = ConvertTo-Sixel -Path $tmp2 -Width 18
         } catch { }
@@ -277,7 +279,7 @@ while ($true) {
     if ($page -eq 2) {
         # rat-nutzung heute (anfragen je stimme): billig, bei jedem aufruf frisch
         $sxRat = $null
-        $ruf2 = "$env:LOCALAPPDATA\copland-rat-usage.json"
+        $ruf2 = Join-Path $CacheDir 'copland-rat-usage.json'
         if ($SixelOn -and (Test-Path $ruf2)) {
             try {
                 $ru2 = Get-Content $ruf2 -Raw | ConvertFrom-Json
@@ -304,7 +306,7 @@ while ($true) {
                             $g4.DrawString("$($vv[$i][1])", $fnt, $fgB, [float](86 + $bl), $y4)
                         }
                         $g4.Dispose()
-                        $tmp4 = "$env:TEMP\copland-panel-rat.png"
+                        $tmp4 = Join-Path $env:TEMP 'copland-panel-rat.png'
                         $bmp4.Save($tmp4, [System.Drawing.Imaging.ImageFormat]::Png); $bmp4.Dispose()
                         $sxRat = ConvertTo-Sixel -Path $tmp4 -Width 18
                     }
@@ -439,7 +441,7 @@ while ($true) {
     }
 
     # --- codex-limits (aus dem juengsten session-log von codex) ---
-    $cxFile = Get-ChildItem "$env:USERPROFILE\.codex\sessions" -Recurse -File -Filter *.jsonl |
+    $cxFile = Get-ChildItem (Join-Path $env:USERPROFILE '.codex/sessions') -Recurse -File -Filter *.jsonl |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if ($cxFile -and $cxFile.LastWriteTime -ne $cxSeen) {
         # nur bei geaendertem log neu scannen -- die datei waechst waehrend codex laeuft
@@ -479,9 +481,9 @@ while ($true) {
         @{ env = 'GEMINI_API_KEY';     cnt = 'gemini';   lbl = 'gemini';  limit = 1500; info = 'google' },
         @{ env = 'MISTRAL_API_KEY';    cnt = 'mistral';  lbl = 'mistral'; limit = 500;  info = 'eu' }
     )
-    $ratActive = @($ratVoices | Where-Object { [Environment]::GetEnvironmentVariable($_.env, 'User') })
+    $ratActive = @($ratVoices | Where-Object { Get-UserEnv $_.env })
     if ($ratActive) {
-        $ruf = "$env:LOCALAPPDATA\copland-rat-usage.json"
+        $ruf = Join-Path $CacheDir 'copland-rat-usage.json'
         $ru = if (Test-Path $ruf) { Get-Content $ruf -Raw | ConvertFrom-Json } else { $null }
         $ruToday = ($ru -and $ru.date -eq (Get-Date -Format 'yyyy-MM-dd'))
         Write-Host $SEPLINE
@@ -521,16 +523,34 @@ while ($true) {
         Write-Host ""
     }
 
-    # --- system-einzeiler ---
+    # --- system-einzeiler (windows: cim | macos: sysctl+vm_stat | linux: /proc/meminfo) ---
+    $ram = $null
     if ($IsWin) {
         $freeGB = [math]::Round((Get-PSDrive C).Free / 1GB)
         $os = Get-CimInstance Win32_OperatingSystem
         $ram = [math]::Round(100 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize * 100))
-        $sysLine = "c: $freeGB gb frei | ram $ram%"
+        $sysLine = "c: $freeGB gb frei"
     } else {
         $freeGB = [math]::Round((New-Object IO.DriveInfo '/').AvailableFreeSpace / 1GB)
         $sysLine = "/: $freeGB gb frei"
+        if ($IsMac) {
+            $memTot = [double](& sysctl -n hw.memsize 2>$null)
+            $vm = @(& vm_stat 2>$null)
+            $pgSz = 4096.0
+            if ($vm.Count -and "$($vm[0])" -match 'page size of (\d+)') { $pgSz = [double]$Matches[1] }
+            $memFree = 0.0
+            foreach ($vl in $vm) { if ($vl -match '^Pages (free|inactive|speculative):\s+(\d+)') { $memFree += [double]$Matches[2] * $pgSz } }
+            if ($memTot -gt 0) { $ram = [math]::Round(100 - $memFree / $memTot * 100) }
+        } elseif (Test-Path '/proc/meminfo') {
+            $memTot = 0.0; $memAv = 0.0
+            foreach ($vl in (Get-Content '/proc/meminfo')) {
+                if ($vl -match '^MemTotal:\s+(\d+)') { $memTot = [double]$Matches[1] }
+                if ($vl -match '^MemAvailable:\s+(\d+)') { $memAv = [double]$Matches[1] }
+            }
+            if ($memTot -gt 0) { $ram = [math]::Round(100 - $memAv / $memTot * 100) }
+        }
     }
+    if ($null -ne $ram) { $sysLine += " | ram $ram%" }
     Write-Host $SEPLINE
     Write-Host ""
     Write-Host "$DIM  $sysLine$R"

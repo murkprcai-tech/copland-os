@@ -34,7 +34,8 @@ it by hand.
 
 ## What it is
 
-Copland OS turns Windows Terminal + PowerShell + [Claude Code](https://claude.com/claude-code)
+Copland OS turns a terminal + PowerShell + [Claude Code](https://claude.com/claude-code)
+(Windows Terminal on Windows, WezTerm on macOS/Linux -- same scripts, same keys)
 into a launcher for your whole life: numbered *life areas* (university, work, ventures,
 private, career) live as folders, every project carries a context file for the AI,
 and a single keypress drops you into an AI session exactly where you left off.
@@ -91,24 +92,30 @@ Four Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skil
 | `/dual` | same task to Claude and Codex (GPT) in parallel, one synthesised answer |
 | `/council` | same question to Claude, GPT, Nemotron, Llama, Qwen -- synthesis + where they disagree (free tiers) |
 
-## Requirements
+## Requirements + install
 
-- Windows 11, Windows Terminal >= 1.22 (sixel), PowerShell 5.1+
-- or macOS with `pwsh` 7 + WezTerm/iTerm2 -- `bash setup/macos.sh` (experimental, see [SETUP.md](SETUP.md))
+One installer, every platform -- the scripts detect the system at runtime:
+
+| | run inside the cloned repo |
+|---|---|
+| **Windows 11** (PowerShell 5.1+, Windows Terminal) | `powershell -ExecutionPolicy Bypass -File setup/install.ps1` |
+| **macOS** (Homebrew) | `bash setup/macos.sh` -- installs pwsh 7, WezTerm, Departure Mono, then the same installer |
+| **Linux** (pwsh 7) | `pwsh -File setup/install.ps1` |
+
 - [Claude Code](https://claude.com/claude-code) (and optionally the Codex CLI)
 - Font: [Departure Mono](https://departuremono.com/) (or any mono font you like)
 - Optional: `ccusage` (npm) for token charts, [Sixel](https://www.powershellgallery.com/packages/Sixel)
-  PowerShell module, Ollama for offline models
+  PowerShell module (Windows Terminal >= 1.22), Ollama for offline models
 
-Root folder defaults to `~/OneDrive`; set `COPLAND_ROOT` for anything else.
-See [SETUP.md](SETUP.md).
+Root folder defaults to `~/OneDrive` (if it exists) or `~/copland`; `-Root <folder>`
+or `COPLAND_ROOT` for anything else. Details and the manual route: [SETUP.md](SETUP.md).
 
 ## Repository layout
 
     copland/   launcher, panel, state/hub generators, council helper, manual
     claude/    statusline scripts, color theme, output-styles/concise.md, skills/ (setup, briefing, dual, council)
     templates/ ROOT-CLAUDE.md (constitution), PROJECT-CLAUDE.md (project context), GLOBAL-CLAUDE.md (answer style)
-    setup/     macos.sh + wezterm.lua
+    setup/     install.ps1 (all platforms), macos.sh (brew bootstrap), wezterm.lua
     docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
 
 ## License

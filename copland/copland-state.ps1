@@ -6,17 +6,17 @@
 # 40_private: nur ordnernamen, ausser assistent (verfassungs-regel 8).
 
 $ErrorActionPreference = 'SilentlyContinue'
-if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
-$OD  = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
-$out = "$OD\00_System\STATE.md"
+# plattform + parser + session-index (EIN scan) aus copland-shared.ps1
+. (Join-Path $PSScriptRoot 'copland-shared.ps1')
+$out = Join-Path $SysDir 'STATE.md'
 
 # --- staleness-guard ---
 if (Test-Path $out) {
     $stateT = (Get-Item $out).LastWriteTime
     if (((Get-Date) - $stateT).TotalHours -lt 6) {
-        $newer = @(Get-ChildItem "$OD\10_uni", "$OD\20_work", "$OD\30_venture", "$OD\50_career", "$OD\00_System" `
+        $newer = @(Get-ChildItem (Join-Path $OD '10_uni'), (Join-Path $OD '20_work'), (Join-Path $OD '30_venture'), (Join-Path $OD '50_career'), $SysDir `
                 -Recurse -Depth 2 -Filter 'CLAUDE.md' | Where-Object { $_.LastWriteTime -gt $stateT })
-        $op2 = Get-Item "$OD\00_System\offene-punkte.md"
+        $op2 = Get-Item (Join-Path $SysDir 'offene-punkte.md')
         if (-not $newer -and $op2.LastWriteTime -le $stateT) { exit }
     }
 }
@@ -26,8 +26,7 @@ $areas = @(
     @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '00_System' }
 )
 
-# session-aktivitaet aus dem gemeinsamen index (copland-shared.ps1, EIN scan)
-. "$OD\00_System\copland\copland-shared.ps1"
+# session-aktivitaet aus dem gemeinsamen index
 $idx = Get-CoplandIndex -Force
 $sess = @{}
 foreach ($prop in $idx.sessions.PSObject.Properties) {
@@ -61,7 +60,7 @@ foreach ($a in $areas) {
             }
         }
         # aktivitaet
-        $sname = ($p.FullName -replace '[:\\_]', '-').ToLower()
+        $sname = ConvertTo-SessionName $p.FullName
         $d = 999; $s30 = 0
         if ($sess.ContainsKey($sname)) {
             $d = [int]((Get-Date) - $sess[$sname].newest).TotalDays
@@ -112,7 +111,7 @@ if ($fristen) {
     [void]$B.AppendLine('')
 }
 # erinnerungen des assistenten als fristen-quelle
-$erin = "$OD\40_private\assistent\erinnerungen.md"
+$erin = Join-Path $OD '40_private/assistent/erinnerungen.md'
 if (Test-Path $erin) {
     $eLines = @(Get-Content $erin -Encoding utf8 | Where-Object { $_ -match '^\s*-\s*\[(\d{4}-\d{2}-\d{2})\]' })
     if ($eLines) {
@@ -123,7 +122,7 @@ if (Test-Path $erin) {
 }
 [void]$B.AppendLine('[offen] (top je abschnitt, volltext: 00_System/offene-punkte.md)')
 $sec = ''; $secCount = 0
-foreach ($ln in (Get-Content "$OD\00_System\offene-punkte.md" -Encoding utf8)) {
+foreach ($ln in (Get-Content (Join-Path $SysDir 'offene-punkte.md') -Encoding utf8)) {
     if ($ln -match '^##\s+(.*)') { $sec = $Matches[1].ToLower(); $secCount = 0 }
     elseif ($sec -and $secCount -lt 2 -and $ln -match '^\s*-\s*(.+)') {
         $t = $Matches[1]; if ($t.Length -gt 90) { $t = $t.Substring(0, 89) + '~' }
@@ -133,7 +132,7 @@ foreach ($ln in (Get-Content "$OD\00_System\offene-punkte.md" -Encoding utf8)) {
 }
 [void]$B.AppendLine('')
 [void]$B.AppendLine('[system]')
-$lastCommit = git -C "$OD\00_System" log -1 --pretty=format:'%h %ad %s' --date=format:'%d.%m.%H:%M'
+$lastCommit = git -C $SysDir log -1 --pretty=format:'%h %ad %s' --date=format:'%d.%m.%H:%M' 2>$null
 [void]$B.AppendLine("git 00_System: $lastCommit")
 
 Set-Content $out $B.ToString() -Encoding utf8

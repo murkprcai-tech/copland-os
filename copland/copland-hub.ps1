@@ -5,9 +5,8 @@
 # aufruf: [h] -> [b] im launcher. 40_private: nur ordnernamen (ausser assistent).
 
 $ErrorActionPreference = 'SilentlyContinue'
-if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
-$OD  = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
-$out = "$OD\00_System\copland\hub.html"
+. (Join-Path $PSScriptRoot 'copland-shared.ps1')
+$out = Join-Path $CoplandDir 'hub.html'
 
 $areas = @(
     @{ name = 'uni'; dir = '10_uni' }, @{ name = 'work'; dir = '20_work' },
@@ -17,12 +16,12 @@ $areas = @(
 
 # --- limits aus den panel-caches ---
 $limits = @{ five = $null; seven = $null; scoped = @() }
-$lc = Get-Content "$env:LOCALAPPDATA\copland-limits.json" -Raw | ConvertFrom-Json
+$lc = Get-Content (Join-Path $CacheDir 'copland-limits.json') -Raw | ConvertFrom-Json
 if ($lc) {
     if ($null -ne $lc.five_hour.used_percentage) { $limits.five = [math]::Round($lc.five_hour.used_percentage) }
     if ($null -ne $lc.seven_day.used_percentage) { $limits.seven = [math]::Round($lc.seven_day.used_percentage) }
 }
-$uc = Get-Content "$env:LOCALAPPDATA\copland-usage.json" -Raw | ConvertFrom-Json
+$uc = Get-Content (Join-Path $CacheDir 'copland-usage.json') -Raw | ConvertFrom-Json
 if ($uc) {
     foreach ($sl in @($uc.limits | Where-Object { $_.kind -eq 'weekly_scoped' -and $_.scope.model.display_name })) {
         $limits.scoped += @{ name = "$($sl.scope.model.display_name)".ToLower(); percent = [math]::Round($sl.percent) }
@@ -32,7 +31,7 @@ if ($uc) {
 # --- heatmap-daten (112 tage) + session-zaehler je projekt-pfad ---
 $heat = @{}
 $projSessions = @{}   # session-dir-name (lower) -> anzahl jsonl letzte 30 tage
-Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
+Get-ChildItem (Join-Path $ClaudeHome 'projects') -Directory | ForEach-Object {
     $c30 = 0
     Get-ChildItem $_.FullName -File -Filter *.jsonl | ForEach-Object {
         if ($_.LastWriteTime -gt (Get-Date).AddDays(-112)) {
@@ -65,11 +64,11 @@ foreach ($a in $areas) {
         $t = $p.LastWriteTime
         if (Test-Path $cmd) { $ct = (Get-Item $cmd).LastWriteTime; if ($ct -gt $t) { $t = $ct } }
         $days = [int]((Get-Date) - $t).TotalDays
-        # session-dir-name aus dem pfad ableiten (mangling: : \ _ -> -)
-        $sname = ($p.FullName -replace '[:\\_]', '-').ToLower()
+        # session-dir-name aus dem pfad ableiten (claude code: nicht-alphanumerisch -> '-')
+        $sname = ConvertTo-SessionName $p.FullName
         $s30 = [int]$projSessions[$sname]
         # sessions der letzten 7 tage grob fuer balance (anteilig via s30 zu ungenau -> eigener zaehler)
-        $sdirFull = "$env:USERPROFILE\.claude\projects\$sname"
+        $sdirFull = Join-Path $ClaudeHome "projects/$sname"
         if (Test-Path $sdirFull) {
             $bal7 += @(Get-ChildItem $sdirFull -File -Filter *.jsonl |
                 Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-7) }).Count
@@ -84,13 +83,13 @@ foreach ($a in $areas) {
 
 # --- commits (30 tage) + werkstatt ---
 $commits = @()
-foreach ($cl in (git -C "$OD\00_System" log --since='30 days ago' --pretty=format:'%ad|%s' --date=format:'%Y-%m-%d')) {
+foreach ($cl in (git -C $SysDir log --since='30 days ago' --pretty=format:'%ad|%s' --date=format:'%Y-%m-%d')) {
     $cd, $cm = $cl -split '\|', 2
     if ($cm.Length -gt 70) { $cm = $cm.Substring(0, 69) + '~' }
     $commits += @{ d = $cd; m = $cm }
 }
 $werk = @()
-foreach ($wf in @(Get-ChildItem "$OD\00_System\werkstatt\html\*.html", "$OD\00_System\werkstatt\pdf\*.pdf" -File |
+foreach ($wf in @(Get-ChildItem (Join-Path $SysDir 'werkstatt/html/*.html'), (Join-Path $SysDir 'werkstatt/pdf/*.pdf') -File |
         Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-30) })) {
     $werk += @{ d = $wf.LastWriteTime.ToString('yyyy-MM-dd'); m = $wf.BaseName }
 }
@@ -98,12 +97,12 @@ foreach ($wf in @(Get-ChildItem "$OD\00_System\werkstatt\html\*.html", "$OD\00_S
 # --- offene punkte + skills ---
 $offen = @()
 $sec = ''
-foreach ($l in (Get-Content "$OD\00_System\offene-punkte.md" -Encoding utf8)) {
+foreach ($l in (Get-Content (Join-Path $SysDir 'offene-punkte.md') -Encoding utf8)) {
     if ($l -match '^##\s+(.*)') { $sec = $Matches[1] }
     elseif ($sec -and $l -match '^\s*-\s*(.+)') { $offen += @{ sec = $sec.ToLower(); text = $Matches[1] } }
 }
-$skills = @(Get-ChildItem "$env:USERPROFILE\.claude\skills" -Directory | ForEach-Object { "/$($_.Name)" }) +
-          @(Get-ChildItem "$env:USERPROFILE\.claude\commands" -File -Filter *.md | ForEach-Object { "/$($_.BaseName)" })
+$skills = @(Get-ChildItem (Join-Path $ClaudeHome 'skills') -Directory | ForEach-Object { "/$($_.Name)" }) +
+          @(Get-ChildItem (Join-Path $ClaudeHome 'commands') -File -Filter *.md | ForEach-Object { "/$($_.BaseName)" })
 
 $data = @{
     generated = (Get-Date -Format 'ddd dd.MM. HH:mm').ToLower()

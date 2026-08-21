@@ -1,76 +1,85 @@
 # Setup
 
 Everything lives under one root folder that contains your life areas
-(`00_System`, `10_uni`, `20_work`, ...). Default root: `~/OneDrive`.
-Set `COPLAND_ROOT` to use any other folder.
+(`00_System`, `10_uni`, `20_work`, ...). Default root: `~/OneDrive` if it exists,
+otherwise `~/copland`. `COPLAND_ROOT` points anywhere else.
 
-## The easy way (any OS)
+The scripts are the same on every platform. They detect the system at runtime
+(Windows PowerShell 5.1 / pwsh 7 on Windows, pwsh 7 on macOS and Linux) and pick
+the matching terminal, cache folder, credentials store and file opener themselves.
+There is nothing to configure per platform -- one installer does it all.
 
-Open the cloned repo in Claude Code and say `/setup` (or just answer yes when it
-offers). It scans your folders read-only, proposes the structure as a table and
-builds it after your go -- including everything below. The manual steps are here
-for reference and for people who prefer to do it themselves.
+## One command
 
-## Windows (primary)
+| platform | run inside the cloned repo |
+|---|---|
+| **Windows** | `powershell -ExecutionPolicy Bypass -File setup/install.ps1` |
+| **macOS** | `bash setup/macos.sh` (installs pwsh + WezTerm + font via Homebrew, then runs the installer) |
+| **Linux** | `pwsh -File setup/install.ps1` (needs pwsh 7; WezTerm optional) |
 
-1. Create your life-area folders, e.g. in OneDrive or any root:
+Add `-Root <folder>` (or the folder as first argument to `macos.sh`) to choose
+another root. Re-run after `git pull` to refresh the scripts -- the installer is
+idempotent and never overwrites your own files (`CLAUDE.md`s, `.wezterm.lua`,
+terminal profiles that already exist).
 
-       00_System  10_uni  20_work  30_venture  40_private  50_career
+What `setup/install.ps1` does, identically on all three systems:
 
-2. Clone this repo and copy `copland/` into `00_System/copland/`.
-3. Copy `claude/copland-statusline.ps1` (and the subagent variant) into `~/.claude/`
-   and register it in `~/.claude/settings.json` under `statusLine`.
-   Copy `claude/copland.json` into `~/.claude/themes/`.
-   Copy `claude/skills/*` into `~/.claude/skills/` (optional, see README "Skills").
-4. Windows Terminal: create a profile "COPLAND OS" whose commandline runs
-   `powershell -NoLogo -NoExit -ExecutionPolicy Bypass -File <root>\00_System\copland\copland.ps1`,
-   black background, your mono font, `scrollbarState: hidden`, padding `32, 16`.
-   Optionally a second hidden profile "COPLAND PANEL" for the sidebar
-   (the launcher splits it in automatically when it runs inside Windows Terminal).
-5. If your root is not `~\OneDrive`: set a user environment variable
-   `COPLAND_ROOT=<root>`.
-6. Adjust the area names inside `copland.ps1` (`$areas`) if yours differ.
-7. Optional free AI council voices: create free keys at openrouter.ai and
-   console.groq.com and store them as user environment variables
-   `OPENROUTER_API_KEY` / `GROQ_API_KEY` (also supported: `GEMINI_API_KEY`,
-   `MISTRAL_API_KEY`). No payment method required -- the helper only ever
-   calls `:free` models.
+1. creates the life-area folders under the root (existing ones untouched)
+2. copies `copland/` to `<root>/00_System/copland/`
+3. copies statusline scripts, color theme, skills and the answer style into `~/.claude/`
+   and registers `statusLine` in `~/.claude/settings.json` (merge, backup written)
+4. persists `COPLAND_ROOT` (Windows: user environment variable; macOS: `~/.zprofile`; Linux: `~/.profile`)
+5. terminal: Windows -> adds the "COPLAND OS" + hidden "COPLAND PANEL" profiles, the
+   color scheme and the keys (`^` new tab, `alt+left/right`) to Windows Terminal
+   (backup written); macOS/Linux -> writes `~/.wezterm.lua` from `setup/wezterm.lua`
+   if you have none
+6. generates the first `STATE.md`
 
-## macOS (experimental)
+## Or let Claude do it
 
-The scripts are PowerShell and run under `pwsh` (PowerShell 7). Windows-only
-bits (Windows Terminal pane split, `%LOCALAPPDATA%`, `explorer`) are detected
-and replaced at runtime: cache goes to `~/.cache/copland`, files open with
-`open`, the panel is started by the terminal instead of by the launcher.
+Open the cloned repo in Claude Code and say `/setup`. It scans your folders
+read-only, proposes the structure as a table, builds it after your go and runs
+the installer for your platform.
 
-One-liner (Homebrew required):
+## How the platform detection works (for the curious)
 
-    git clone <this repo> && cd copland-os
-    bash setup/macos.sh ~/copland        # your root folder; default ~/copland
+`copland/copland-shared.ps1` is dot-sourced by every script and sets
+`$IsWin / $IsMac / $IsLin`, the cache folder (`%LOCALAPPDATA%` or `~/.cache/copland`),
+`$PSExe` (`powershell` or `pwsh`) and a few helpers:
 
-It installs `pwsh`, WezTerm and Departure Mono, creates the area folders,
-copies scripts / statusline / theme / skills, writes `~/.wezterm.lua` (launcher
-left, panel right, `^` = new tab, `alt+arrows` = switch tabs) and exports
-`COPLAND_ROOT` in `~/.zprofile`. Open WezTerm -- you are in the launcher.
+| concern | Windows | macOS / Linux |
+|---|---|---|
+| panel split | `wt split-pane` (Windows Terminal) | `wezterm cli split-pane` or `tmux split-window`; other terminals: start `copland-panel.ps1` in a second pane yourself |
+| open file / folder / url | `Start-Process` | `open` / `xdg-open` |
+| Claude usage limits | `~/.claude/.credentials.json` | macOS keychain (`security find-generic-password`) or the json if present |
+| system line (disk / ram) | CIM | `sysctl` + `vm_stat` / `/proc/meminfo` |
+| council api keys | user environment variables | exported in your shell profile |
+| sixel graphics page | Windows Terminal >= 1.22 + `Sixel` module | not available (System.Drawing is Windows-only) -- the text pages are identical |
 
-Prefer iTerm2? Use any sixel-capable terminal and run
-`pwsh -NoLogo -NoExit -File <root>/00_System/copland/copland.ps1` yourself;
-open a second narrow pane with `copland-panel.ps1`.
+Everything else is plain PowerShell and behaves the same everywhere. Paths inside
+the scripts are built with `Join-Path` / forward slashes, which both platforms accept.
 
-Known limits on macOS (honest list -- built on Windows, **not tested on a Mac**):
+## Manual route (if you prefer)
 
-- sixel graphics page needs the `Sixel` PowerShell module + System.Drawing;
-  without it the panel silently shows the text pages only.
-- the hub's "open in browser" and the workshop's "open file" use `open`.
-- the state generator runs fine; the statusline expects Claude Code's
-  `statusLine` JSON on stdin as on Windows.
-- paths inside the scripts are written with backslashes; `pwsh` on macOS
-  normalises them in its own cmdlets, but if something does not find a file,
-  that is the first place to look. Issues and PRs welcome.
+1. Create the area folders, copy `copland/` into `<root>/00_System/copland/`.
+2. Copy `claude/copland-statusline.ps1` (+ subagent variant) into `~/.claude/`,
+   `claude/copland.json` into `~/.claude/themes/`, `claude/skills/*` into `~/.claude/skills/`.
+   Register in `~/.claude/settings.json`:
 
-## Notes
+       "statusLine": { "type": "command", "command": "pwsh -NoProfile -File \"<home>/.claude/copland-statusline.ps1\"", "refreshInterval": 60 }
 
-- Everything is plain files + git. No database, no daemon.
-- The AI context convention: every project folder carries a `CLAUDE.md`
-  (purpose / status / rules, plus a one-line header with aliases and links).
-  The state generator harvests those into a single `STATE.md`.
+   (Windows: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...`)
+3. Set `COPLAND_ROOT` if your root is not `~/OneDrive`.
+4. Terminal: run `pwsh -NoLogo -NoExit -File <root>/00_System/copland/copland.ps1`
+   (Windows: `powershell.exe ... -ExecutionPolicy Bypass -File ...`) as the
+   profile command; black background, your mono font, padding `32, 16`, no scrollbar.
+5. Adjust `$areas` in `copland.ps1` if your area names differ.
+6. Optional council voices: free keys from openrouter.ai / console.groq.com as
+   `OPENROUTER_API_KEY` / `GROQ_API_KEY` (also `GEMINI_API_KEY`, `MISTRAL_API_KEY`).
+
+## Honest note
+
+Copland was built and is used daily on Windows 11. The macOS/Linux path is the
+same code with the platform branches above; it was reviewed line by line and
+parsed under pwsh, but the author has no Mac on the desk. If something is off,
+open an issue with the line -- it will be a one-liner.

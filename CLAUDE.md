@@ -30,8 +30,10 @@ not to explain the scripts.
      project (from `templates/PROJECT-CLAUDE.md`), and `00_System/copland/`
    - moving existing folders into areas is **opt-in per folder**, always
      with a recap; **never delete anything**
-   - set `COPLAND_ROOT`, install statusline/theme/skills, explain the
-     terminal profile (Windows Terminal) or run `setup/macos.sh`
+   - run the installer for this platform (it detects the OS itself and does
+     folders, scripts, statusline/theme/skills, `COPLAND_ROOT`, terminal profile):
+     Windows `powershell -ExecutionPolicy Bypass -File setup/install.ps1 -Root <root>`,
+     macOS `bash setup/macos.sh <root>`, Linux `pwsh -File setup/install.ps1 -Root <root>`
    - finish by generating `STATE.md` and showing it
 
 ## Rules in this repo
@@ -44,3 +46,6 @@ not to explain the scripts.
 - Keep the Copland tone: lowercase, short, no filler.
 - Do not modify the scripts to "fix" someone's setup -- use `COPLAND_ROOT`
   and the `$areas` table in `copland.ps1`.
+- Platform: detect it (`$env:OS -eq 'Windows_NT'`, `$IsMacOS`, `$IsLinux`) and
+  run the matching line above. The scripts themselves are identical on all
+  three -- never tell a macOS user the project is Windows-only.

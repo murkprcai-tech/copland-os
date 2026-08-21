@@ -4,7 +4,7 @@
 # sind hiermit reserviert -- NIE als laufvariablen o.ae. verwenden ($r zerstoert $R,
 # das gab schon dreimal kaputte anzeigen: wetter, hub-rendering, hauptmenue).
 # wird von copland.ps1 und copland-panel.ps1 dot-sourced.
-# ausnahme: die statuslines in ~\.claude tragen eine eigene kopie,
+# ausnahme: die statuslines in ~/.claude tragen eine eigene kopie,
 # damit sie auch ohne onedrive-zugriff funktionieren.
 
 $E    = [char]27
@@ -15,10 +15,15 @@ $WARN = "$E[38;2;194;132;143m"   # warnung
 $R    = "$E[0m"
 
 # --- plattform ---------------------------------------------------------------
-# windows = primaer (powershell 5.1, windows terminal). macos/linux via pwsh =
-# experimentell. COPLAND_ROOT = ordner mit den bereichen (00_System, 10_uni, ...);
-# default: ~\OneDrive. fehlende windows-variablen werden fuer unix nachgebildet.
+# laeuft 1:1 auf windows (powershell 5.1 / pwsh 7) und macos/linux (pwsh 7).
+# die skripte erkennen das system selbst -- nichts zu konfigurieren ausser
+# COPLAND_ROOT = ordner mit den bereichen (00_System, 10_uni, ...), default ~/OneDrive.
+# regel: pfade IMMER mit Join-Path oder '/' bauen -- windows versteht beides,
+# unix nur '/'. fehlende windows-variablen werden fuer unix nachgebildet.
 $IsWin = ($env:OS -eq 'Windows_NT')
+$IsMac = [bool](Get-Variable IsMacOS -ValueOnly -ErrorAction SilentlyContinue)
+$IsLin = (-not $IsWin) -and (-not $IsMac)
+if (-not $env:HOME)        { $env:HOME = $env:USERPROFILE }
 if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
 if (-not $env:LOCALAPPDATA) {
     $env:LOCALAPPDATA = Join-Path $HOME '.cache/copland'
@@ -26,14 +31,45 @@ if (-not $env:LOCALAPPDATA) {
 }
 if (-not $env:TEMP) { $env:TEMP = [IO.Path]::GetTempPath().TrimEnd('/', '\') }
 $OD    = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
+$OD    = $OD.TrimEnd('/', '\')
 $PSExe = if ($IsWin) { 'powershell' } else { 'pwsh' }
+# feste orte (eine stelle, ueberall dieselben namen)
+$SysDir     = Join-Path $OD '00_System'           # systemraum (STATE.md, offene-punkte.md, werkstatt)
+$CoplandDir = $PSScriptRoot                       # dieser ordner (launcher, panel, hub, manual)
+$ClaudeHome = Join-Path $env:USERPROFILE '.claude'
+$CacheDir   = $env:LOCALAPPDATA                   # panel-caches (limits, usage, index, sessions)
 # claude code benennt session-ordner nach dem pfad (nicht-alphanumerisch -> '-'), z.b. c--users-me-onedrive-10-uni
 $ODMangled = (($OD -replace '[^A-Za-z0-9]', '-') + '-').ToLower()
+function ConvertTo-SessionName([string]$p) { ($p -replace '[^A-Za-z0-9]', '-').ToLower() }
 # datei/url mit dem systemstandard oeffnen (explorer / open / xdg-open)
 function Open-Item([string]$p) {
     if ($IsWin) { Start-Process $p }
     elseif (Get-Command open -ErrorAction SilentlyContinue) { & open $p }
     else { & xdg-open $p }
+}
+# skript unsichtbar im hintergrund starten (state-generator u.ae.)
+function Start-Hidden([string]$scriptPath) {
+    if ($IsWin) { Start-Process -WindowStyle Hidden $PSExe -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath }
+    else        { Start-Process $PSExe -ArgumentList '-NoProfile', '-File', $scriptPath }
+}
+# umgebungsvariable: windows = user-scope (setx), unix = prozess/profil
+function Get-UserEnv([string]$n) {
+    $v = $null
+    if ($IsWin) { $v = [Environment]::GetEnvironmentVariable($n, 'User') }
+    if (-not $v) { $v = [Environment]::GetEnvironmentVariable($n) }
+    $v
+}
+# claude-oauth-token: datei (windows/linux) oder keychain (macos)
+function Get-ClaudeToken {
+    $f = Join-Path $ClaudeHome '.credentials.json'
+    if (Test-Path $f) { try { return (Get-Content $f -Raw | ConvertFrom-Json).claudeAiOauth.accessToken } catch { } }
+    if ($IsMac) {
+        try {
+            $raw = & security find-generic-password -s 'Claude Code-credentials' -w 2>$null
+            if ($raw) { return ("$raw" | ConvertFrom-Json).claudeAiOauth.accessToken }
+        } catch { }
+    }
+    $null
 }
 
 # ascii-balken: anteil $p (0-100) auf breite $w
@@ -51,7 +87,7 @@ function Get-ActivityLevel([int]$v) {
 
 # offene-punkte.md parsen: liste aus @{sec; text}
 function Get-OffenePunkte {
-    $op = "$OD\00_System\offene-punkte.md"
+    $op = Join-Path $SysDir 'offene-punkte.md'
     $out = @()
     if (Test-Path $op) {
         $sec = ''
@@ -85,7 +121,7 @@ function Get-ProjectMeta([string]$projPath) {
 # session-index: EIN scan ueber ~\.claude\projects, gecacht als json (10 min).
 # liefert je session-ordner (kleingeschrieben): newest (iso), s7, s30 -- plus heat (datum->anzahl, 112d)
 function Get-CoplandIndex([switch]$Force) {
-    $idxFile = "$env:LOCALAPPDATA\copland-index.json"
+    $idxFile = Join-Path $CacheDir 'copland-index.json'
     if (-not $Force -and (Test-Path $idxFile)) {
         if (((Get-Date) - (Get-Item $idxFile).LastWriteTime).TotalMinutes -lt 10) {
             return (Get-Content $idxFile -Raw | ConvertFrom-Json)
@@ -93,7 +129,7 @@ function Get-CoplandIndex([switch]$Force) {
     }
     $sess = @{}
     $heat = @{}
-    Get-ChildItem "$env:USERPROFILE\.claude\projects" -Directory | ForEach-Object {
+    Get-ChildItem (Join-Path $ClaudeHome 'projects') -Directory | ForEach-Object {
         $files = @(Get-ChildItem $_.FullName -File -Filter *.jsonl)
         if (-not $files) { return }
         $newest = ($files | Sort-Object LastWriteTime -Descending)[0].LastWriteTime

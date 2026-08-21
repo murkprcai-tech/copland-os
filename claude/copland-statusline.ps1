@@ -36,11 +36,15 @@ $model = "$model".ToLower()
 $ctx = $null
 if ($null -ne $j.context_window.used_percentage) { $ctx = [math]::Round($j.context_window.used_percentage) }
 
+# plattform: laeuft unter powershell 5.1 / pwsh 7 auf windows, macos, linux
+$IsWin = ($env:OS -eq 'Windows_NT')
 if (-not $env:USERPROFILE) { $env:USERPROFILE = $HOME }
+if (-not $env:LOCALAPPDATA) { $env:LOCALAPPDATA = Join-Path $HOME '.cache/copland'; $null = New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA }
 $od = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
+$od = $od.TrimEnd('/', '\')
 $rel = $dir
-if ($dir -like "$od*") { $rel = $dir.Substring($od.Length).TrimStart('\') }
-if (-not $rel) { $rel = 'OneDrive' }
+if ($dir -like "$od*") { $rel = $dir.Substring($od.Length).TrimStart('\', '/') }
+if (-not $rel) { $rel = Split-Path $od -Leaf }
 
 @{
     model     = $model
@@ -52,7 +56,7 @@ if (-not $rel) { $rel = 'OneDrive' }
     seven_day = $j.rate_limits.seven_day
     ccv       = $j.version
     ts        = [DateTimeOffset]::Now.ToUnixTimeSeconds()
-} | ConvertTo-Json -Compress | Set-Content "$env:LOCALAPPDATA\copland-limits.json" -Encoding utf8
+} | ConvertTo-Json -Compress | Set-Content (Join-Path $env:LOCALAPPDATA 'copland-limits.json') -Encoding utf8
 
 # --- Git-Sync-Status fuers Panel (Anzeige rechts, nicht hier unten) ---
 # behind = Commits auf origin, die lokal fehlen -> /nachziehen
@@ -68,8 +72,9 @@ if ($gitDir) {
     if (Test-Path $marker) { $last = [int64](Get-Content $marker -Raw).Trim() }
     if ($now - $last -ge 120) {
         Set-Content $marker $now -Encoding ascii
-        Start-Process -WindowStyle Hidden powershell.exe -ArgumentList `
-            '-NoProfile', '-Command', "`$env:GIT_TERMINAL_PROMPT='0'; git -C '$dir' fetch --quiet" | Out-Null
+        $fetchCmd = "`$env:GIT_TERMINAL_PROMPT='0'; git -C '$dir' fetch --quiet"
+        if ($IsWin) { Start-Process -WindowStyle Hidden powershell.exe -ArgumentList '-NoProfile', '-Command', $fetchCmd | Out-Null }
+        else        { Start-Process pwsh -ArgumentList '-NoProfile', '-Command', $fetchCmd | Out-Null }
     }
     # ahead/behind + Konflikt-Zustand rein lokal ermitteln (billig, kein Netz).
     $behind = 0; $ahead = 0
@@ -82,11 +87,11 @@ if ($gitDir) {
 }
 
 # --- Session-Datei fuer die Panel-Uebersicht (aktive sessions) ---
-$sdir = "$env:LOCALAPPDATA\copland-sessions"
+$sdir = Join-Path $env:LOCALAPPDATA 'copland-sessions'
 if (-not (Test-Path $sdir)) { New-Item -ItemType Directory -Path $sdir -Force | Out-Null }
 if ($j.session_id) {
     @{ area = $area; name = $name; git = $git; ts = [DateTimeOffset]::Now.ToUnixTimeSeconds() } |
-        ConvertTo-Json -Compress | Set-Content "$sdir\$($j.session_id).json" -Encoding utf8
+        ConvertTo-Json -Compress | Set-Content (Join-Path $sdir "$($j.session_id).json") -Encoding utf8
 }
 Get-ChildItem $sdir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-10) } | Remove-Item -Force
 

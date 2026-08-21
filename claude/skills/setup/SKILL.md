@@ -71,15 +71,17 @@ For every confirmed row, in this order:
    from reading documents), status "set up by /setup on <date>"
 4. moves: only rows marked "move"; `Move-Item`/`mv` the whole folder; after each
    batch a recap "moved: a -> b" -- the user reads it before the next batch
-5. `COPLAND_ROOT`: Windows `[Environment]::SetEnvironmentVariable('COPLAND_ROOT', <root>, 'User')`,
-   macOS `export COPLAND_ROOT=<root>` in `~/.zprofile`
-6. claude bits: statusline scripts to `~/.claude/`, `copland.json` to
-   `~/.claude/themes/`, skills to `~/.claude/skills/`; register `statusLine`
-   in `~/.claude/settings.json` (show the JSON, do not overwrite other keys)
-7. terminal: Windows -> explain the "COPLAND OS" profile (see SETUP.md step 4)
-   and offer to write it into Windows Terminal `settings.json` (ask first);
-   macOS -> run `setup/macos.sh <root>`
-8. adjust `$areas` in `copland.ps1` if the area names differ from the default
+5. run the installer -- it detects the platform and does `COPLAND_ROOT`, the
+   claude bits (statusline/theme/skills/answer style, `statusLine` merged into
+   `~/.claude/settings.json` with a backup) and the terminal profile in one go:
+
+       Windows:  powershell -ExecutionPolicy Bypass -File setup/install.ps1 -Root <root>
+       macOS:    bash setup/macos.sh <root>      (brew: pwsh, wezterm, font -> then install.ps1)
+       Linux:    pwsh -File setup/install.ps1 -Root <root>
+
+   tell the user what it will touch (Windows Terminal settings.json / ~/.wezterm.lua,
+   ~/.claude/settings.json -- both backed up) and ask once before running it
+6. adjust `$areas` in `copland.ps1` if the area names differ from the default
 
 ## 3b. Connect what you have (ask, do not assume)
 

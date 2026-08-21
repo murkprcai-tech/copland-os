@@ -1,11 +1,11 @@
 # COPLAND OS — Launcher (Master-Umgebung Marko)
-# Aufgerufen vom Windows-Terminal-Profil "COPLAND OS"
+# windows: windows-terminal-profil "COPLAND OS" | macos/linux: wezterm (default_prog) oder pwsh -File
 # workflow: menue -> bereich -> session | ^ = neuer tab | alt+links/rechts = tab-switch
 
 $ErrorActionPreference = 'SilentlyContinue'
 
 # Farben + plattform ($OD, $IsWin, $PSExe) -- gemeinsam mit dem panel
-. "$PSScriptRoot\copland-shared.ps1"
+. (Join-Path $PSScriptRoot 'copland-shared.ps1')
 
 # kurze warnung im copland-ton -- fehler sollen hoerbar sein, nicht stumm versickern
 function Warn([string]$msg) {
@@ -65,22 +65,31 @@ function Step-Rain {
     Write-Host -NoNewline "$out$E[u"
 }
 
-# --- Panel rechts (uhr + limits) ---
+# --- Panel rechts (uhr + limits): terminal wird erkannt, kein setup noetig ---
+# windows terminal -> wt split-pane | wezterm (macos/linux/win) -> wezterm cli |
+# tmux -> split-window | sonst (iterm2, terminal.app, ...): panel von hand starten (manual)
 Clear-Host
-if ($env:WT_SESSION -and -not $env:COPLAND_NO_PANEL) {
-    # -p: panel erbt das schwarze copland-profil (sonst default-grau)
-    # eigenes panel-profil: schwarz wie das hauptprofil, aber departure mono
-    wt -w 0 split-pane -p "COPLAND PANEL" --vertical --size 0.2 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$OD\00_System\copland\copland-panel.ps1"
-    # fokus zweimal zurueckholen: faengt auch langsame pane-starts (move-focus ganz links = no-op)
-    Start-Sleep -Milliseconds 500
-    wt -w 0 move-focus left
-    Start-Sleep -Milliseconds 700
-    wt -w 0 move-focus left
+$panelPs = Join-Path $CoplandDir 'copland-panel.ps1'
+if (-not $env:COPLAND_NO_PANEL) {
+    if ($env:WT_SESSION -and (Get-Command wt -ErrorAction SilentlyContinue)) {
+        # -p: eigenes panel-profil (schwarz wie das hauptprofil, departure mono)
+        wt -w 0 split-pane -p "COPLAND PANEL" --vertical --size 0.2 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $panelPs
+        # fokus zweimal zurueckholen: faengt auch langsame pane-starts (move-focus ganz links = no-op)
+        Start-Sleep -Milliseconds 500
+        wt -w 0 move-focus left
+        Start-Sleep -Milliseconds 700
+        wt -w 0 move-focus left
+    } elseif ($env:WEZTERM_PANE -and (Get-Command wezterm -ErrorAction SilentlyContinue)) {
+        $null = & wezterm cli split-pane --right --percent 20 -- $PSExe -NoLogo -NoProfile -File $panelPs
+        Start-Sleep -Milliseconds 400
+        $null = & wezterm cli activate-pane-direction left
+    } elseif ($env:TMUX -and (Get-Command tmux -ErrorAction SilentlyContinue)) {
+        & tmux split-window -h -p 20 -d "$PSExe -NoLogo -NoProfile -File '$panelPs'"
+    }
 }
 
 # STATE.md aktualisieren (eigener prozess, staleness-guard macht es billig)
-if ($IsWin) { Start-Process -WindowStyle Hidden powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$OD\00_System\copland\copland-state.ps1" }
-else        { Start-Process $PSExe -ArgumentList '-NoProfile', '-File', "$OD/00_System/copland/copland-state.ps1" }
+Start-Hidden (Join-Path $CoplandDir 'copland-state.ps1')
 
 # ziffer = ordner-dekade (1=10, 2=20, ...), [s] = systemraum
 $areas = @(
@@ -148,7 +157,7 @@ function Show-Menu {
     Write-Host ""
     # zwei spalten: links NUR ziffern (0-6, sortiert), rechts NUR buchstaben (alphabetisch)
     $menuRows = @(
-        @('0', 'shell  ', 'powershell', 'a', 'ALLTAG ', 'briefing'),
+        @('0', 'shell  ', $PSExe,       'a', 'ALLTAG ', 'briefing'),
         @('1', 'UNI    ', '10_uni',     'b', 'backup ', ''),
         @('2', 'WORK   ', '20_work',    'h', 'hub    ', ''),
         @('3', 'VENTURE', '30_venture', 'm', 'manual ', ''),
@@ -248,14 +257,14 @@ while ($true) {
         Write-Host ""
         Write-Host "$AC   BACKUP$R$DIM  sichere configs nach onedrive ...$R"
         Write-Host ""
-        $bk = "$OD\00_System\copland\backup\copland-backup.ps1"
+        $bk = Join-Path $CoplandDir 'backup/copland-backup.ps1'
         if (Test-Path $bk) { & $bk } else { Warn 'backup-skript nicht gefunden' }
         Wait-Back
         continue
     }
     if ("$k" -match '^[aA]$') {
         # alltag: eigener ort fuer den personal assistant, startet direkt mit /briefing
-        $adir = "$OD\40_private\assistent"
+        $adir = Join-Path $OD '40_private/assistent'
         if (-not (Test-Path $adir)) { New-Item -ItemType Directory -Path $adir -Force | Out-Null }
         if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { Warn 'claude nicht gefunden'; continue }
         Set-Location $adir
@@ -285,15 +294,15 @@ while ($true) {
                 $dstr = $now.ToString('ddd dd.MM.').ToLower()
                 $lim = ''
                 $mc = $null
-                if (Test-Path "$env:LOCALAPPDATA\copland-limits.json") {
-                    $mc = Get-Content "$env:LOCALAPPDATA\copland-limits.json" -Raw | ConvertFrom-Json
-                }
+                $limF = Join-Path $CacheDir 'copland-limits.json'
+                if (Test-Path $limF) { $mc = Get-Content $limF -Raw | ConvertFrom-Json }
                 if ($mc) {
                     if ($null -ne $mc.five_hour.used_percentage) { $lim += "5h $([math]::Round($mc.five_hour.used_percentage))%" }
                     if ($null -ne $mc.seven_day.used_percentage) { $lim += "   7d $([math]::Round($mc.seven_day.used_percentage))%" }
                 }
-                if (Test-Path "$env:LOCALAPPDATA\copland-usage.json") {
-                    $msc = @((Get-Content "$env:LOCALAPPDATA\copland-usage.json" -Raw | ConvertFrom-Json).limits |
+                $usF = Join-Path $CacheDir 'copland-usage.json'
+                if (Test-Path $usF) {
+                    $msc = @((Get-Content $usF -Raw | ConvertFrom-Json).limits |
                         Where-Object { $_.kind -eq 'weekly_scoped' -and $_.scope.model.display_name })
                     foreach ($ms in $msc) { $lim += "   $("$($ms.scope.model.display_name)".ToLower()) $([math]::Round($ms.percent))%" }
                 }
@@ -336,7 +345,7 @@ while ($true) {
             $L.Add(@{ t = ''; c = '' })
         }
         $RC.Add(@{ t = 'ZULETZT'; c = "${AC}ZULETZT$R" })
-        foreach ($gl in (git -C "$OD\00_System" log --pretty=format:'%ad  %s' --date=format:'%d.%m.' -8)) {
+        foreach ($gl in (git -C $SysDir log --pretty=format:'%ad  %s' --date=format:'%d.%m.' -8)) {
             $gls = "$gl"
             if ($gls.Length -gt 44) { $gls = $gls.Substring(0, 43) + '~' }
             $RC.Add(@{ t = " $gls"; c = "$DIM $gls$R" })
@@ -367,8 +376,8 @@ while ($true) {
             $RC.Add(@{ t = ''; c = '' })
         }
         $RC.Add(@{ t = 'SKILLS'; c = "${AC}SKILLS$R" })
-        $skl = @(Get-ChildItem "$env:USERPROFILE\.claude\skills" -Directory | ForEach-Object { "/$($_.Name)" }) +
-               @(Get-ChildItem "$env:USERPROFILE\.claude\commands" -File -Filter *.md | ForEach-Object { "/$($_.BaseName)" })
+        $skl = @(Get-ChildItem (Join-Path $ClaudeHome 'skills') -Directory | ForEach-Object { "/$($_.Name)" }) +
+               @(Get-ChildItem (Join-Path $ClaudeHome 'commands') -File -Filter *.md | ForEach-Object { "/$($_.BaseName)" })
         $lineBuf = ''
         foreach ($s2 in $skl) {
             if (($lineBuf + ' ' + $s2).Length -gt 44) { $RC.Add(@{ t = " $lineBuf"; c = "$DIM $lineBuf$R" }); $lineBuf = $s2 }
@@ -394,8 +403,8 @@ while ($true) {
         while ($true) {
             $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             if ("$c" -match '^[bB]$') {
-                & "$OD\00_System\copland\copland-hub.ps1" | Out-Null
-                Open-Item "$OD\00_System\copland\hub.html"
+                & (Join-Path $CoplandDir 'copland-hub.ps1') | Out-Null
+                Open-Item (Join-Path $CoplandDir 'hub.html')
                 break
             }
             if ("$c" -match '^[zZ]$') { break }
@@ -404,20 +413,20 @@ while ($true) {
     }
     if ("$k" -match '^[mM]$') {
         Clear-Host
-        Get-Content "$OD\00_System\copland\manual.md" | ForEach-Object {
+        Get-Content (Join-Path $CoplandDir 'manual.md') | ForEach-Object {
             if ($_ -match '^[A-Z]') { Write-Host "$AC$_$R" } else { Write-Host "$FG$_$R" }
         }
         Wait-Back
         continue
     }
     if ("$k" -match '^[67]$') {
-        $wdir = "$OD\00_System\werkstatt"
+        $wdir = Join-Path $SysDir 'werkstatt'
         while ($true) {
             Clear-Host
             Write-Host ""
             Write-Host "$AC   WERKSTATT$R"
             Write-Host "$DIM   ---------------------------------------$R"
-            $files = @(Get-ChildItem "$wdir\html\*.html", "$wdir\pdf\*.pdf" -File) |
+            $files = @(Get-ChildItem (Join-Path $wdir 'html/*.html'), (Join-Path $wdir 'pdf/*.pdf') -File) |
                 Sort-Object LastWriteTime -Descending | Select-Object -First 9
             if ($files) {
                 $i = 1
@@ -437,7 +446,7 @@ while ($true) {
             Write-Host -NoNewline "$AC   > $R"
             $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             if ("$c" -match '^[zZ]$') { break }
-            if ("$c" -match '^[iI]$') { Open-Item "$wdir\INDEX.html"; continue }
+            if ("$c" -match '^[iI]$') { Open-Item (Join-Path $wdir 'INDEX.html'); continue }
             if ("$c" -match '^[eE]$') { if ($IsWin) { Start-Process explorer $wdir } else { Open-Item $wdir }; continue }
             if ("$c" -match '^[1-9]$') {
                 $idx = [int]"$c" - 1
