@@ -12,6 +12,14 @@ Built by **Marko Piric**.
 
 *The launcher: one key per life area, a few keys for tools. Nothing else on screen.*
 
+## Why
+
+Five life areas, two dozen projects, one head. Every AI session used to start with
+"where were we?". Copland OS makes the folder structure itself the memory: the
+launcher knows the areas, every project carries its context, and a single generated
+file tells the AI what is going on everywhere. You press one key and are back inside
+the right project with the right context -- nothing to explain.
+
 ## What it is
 
 Copland OS turns Windows Terminal + PowerShell + [Claude Code](https://claude.com/claude-code)
@@ -26,6 +34,9 @@ and a single keypress drops you into an AI session exactly where you left off.
 - **Panel** -- a slim live sidebar in every tab: clock, weather, Claude/Codex/free-AI
   usage limits as bars, burn-rate curve (braille), sixel graphics page
   (token curves, model split, activity heatmap) -- switch pages with arrow keys or `alt+g`
+
+  <img src="docs/panel.png" width="300" alt="panel">
+
 - **STATE.md generator** -- machine-readable snapshot of all projects, aliases,
   deadlines and cross-project links; the AI reads your whole world in one file
 - **Hub** -- terminal dashboard + self-contained HTML command center
@@ -59,7 +70,7 @@ See [SETUP.md](SETUP.md).
 
     copland/   launcher, panel, state/hub generators, council helper, manual
     claude/    statusline scripts + Claude Code color theme
-    docs/      screenshot, animated banner, architecture diagram (svg)
+    docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
 
 ## License
 
