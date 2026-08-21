@@ -81,6 +81,24 @@ For every confirmed row, in this order:
    macOS -> run `setup/macos.sh <root>`
 8. adjust `$areas` in `copland.ps1` if the area names differ from the default
 
+## 3b. Connect what you have (ask, do not assume)
+
+One question block, yes/no per line. Each "yes" gets installed/explained; each
+"no" simply leaves that part of the panel/launcher empty -- the panel shows only
+what is connected (no codex log = no codex row, no keys = no council row,
+no ollama = `[o]` warns and returns).
+
+| connect? | what it gives you | how |
+|---|---|---|
+| **answer style** | the copland voice: short, essence first (`claude/output-styles/concise.md` + `templates/GLOBAL-CLAUDE.md`) | copy style to `~/.claude/output-styles/`, set `"outputStyle": "concise"` in `~/.claude/settings.json`; copy template to `~/.claude/CLAUDE.md` if none exists, else show it for merging |
+| **codex cli** (openai) | second opinion via `/dual` and `/council`, codex limits in the panel | `npm i -g @openai/codex`, `codex login`; panel reads `~/.codex/sessions` |
+| **local models** (ollama) | `[o]` in the launcher: offline chat, no tokens spent | install ollama, `ollama pull gpt-oss:20b` (or any model); launcher lists what is pulled |
+| **council keys** (free) | nemotron / llama / qwen voices in `/council`, remaining calls in the panel | `OPENROUTER_API_KEY`, `GROQ_API_KEY` as user env vars -- free tiers, no card |
+| **calendar + mail** | `/briefing` with real events and mails | Google Calendar / Gmail connectors in claude code (MCP) -- the user sets these up in the claude.ai connectors page, you only check whether they exist |
+| **sixel graphics** | token curves / model split page in the panel (`alt+g`) | Windows Terminal >= 1.22 + `Install-Module Sixel`; skip on terminals without sixel |
+
+Then restart the launcher so the panel picks the new sources up.
+
 ## 4. Finish
 
 Run the state generator (`copland-state.ps1`), show `STATE.md`, then three lines:

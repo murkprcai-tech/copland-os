@@ -32,6 +32,8 @@ cp -R "$HERE/copland/." "$ROOT/00_System/copland/"
 cp "$HERE/claude/copland-statusline.ps1" "$HERE/claude/copland-subagent-statusline.ps1" "$HOME/.claude/"
 cp "$HERE/claude/copland.json" "$HOME/.claude/themes/"
 cp -R "$HERE/claude/skills/." "$HOME/.claude/skills/"
+mkdir -p "$HOME/.claude/output-styles" && cp "$HERE/claude/output-styles/concise.md" "$HOME/.claude/output-styles/"
+[ -f "$HOME/.claude/CLAUDE.md" ] || cp "$HERE/templates/GLOBAL-CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 
 # 4 wezterm config (only if none exists)
 if [ ! -f "$HOME/.wezterm.lua" ]; then

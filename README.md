@@ -66,6 +66,20 @@ Everything is plain files: folders are life areas, each project carries a `CLAUD
 a generator folds all of them into one `STATE.md`, and the AI reads that single file
 to know where you are. No database, no daemon, no framework.
 
+## What is in the box
+
+Everything that makes the environment feel like one thing, not five tools:
+
+- the **launcher + panel** (terminal), **STATE.md** generator, **hub**
+- the **answer style** -- `claude/output-styles/concise.md` + `templates/GLOBAL-CLAUDE.md`:
+  short, essence first, no filler. `/setup` offers to install it
+- the **constitution** and project templates (`templates/`) -- the rules that keep
+  folders and context files consistent
+- the **skills** below, and the **council helper** for free second opinions
+- **optional connections** the setup asks for: Codex CLI, local models via Ollama
+  (`[o]`), free council keys, calendar/mail connectors, sixel graphics. The panel
+  only shows what is connected -- nothing configured, nothing displayed
+
 ## Skills (built in)
 
 Four Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skills/`:
@@ -92,8 +106,8 @@ See [SETUP.md](SETUP.md).
 ## Repository layout
 
     copland/   launcher, panel, state/hub generators, council helper, manual
-    claude/    statusline scripts, Claude Code color theme, skills/ (setup, briefing, dual, council)
-    templates/ ROOT-CLAUDE.md (constitution), PROJECT-CLAUDE.md (per-project context)
+    claude/    statusline scripts, color theme, output-styles/concise.md, skills/ (setup, briefing, dual, council)
+    templates/ ROOT-CLAUDE.md (constitution), PROJECT-CLAUDE.md (project context), GLOBAL-CLAUDE.md (answer style)
     setup/     macos.sh + wezterm.lua
     docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
 
