@@ -1,4 +1,4 @@
-# COPLAND OS
+![COPLAND OS](docs/banner.svg)
 
 > present day. present time.
 
@@ -8,7 +8,9 @@ pure ASCII, function over decoration.
 
 Built by **Marko Piric**.
 
-![screenshot](docs/screenshot.png)
+![launcher](docs/screenshot.png)
+
+*The launcher: one key per life area, a few keys for tools. Nothing else on screen.*
 
 ## What it is
 
@@ -33,6 +35,14 @@ and a single keypress drops you into an AI session exactly where you left off.
   "where they disagree" block; the extra voices run on free API tiers (0 EUR)
 - **Ambient mode** -- fullscreen clock + limits + rain when you are not working
 
+## How it fits together
+
+![architecture](docs/architecture.svg)
+
+Everything is plain files: folders are life areas, each project carries a `CLAUDE.md`,
+a generator folds all of them into one `STATE.md`, and the AI reads that single file
+to know where you are. No database, no daemon, no framework.
+
 ## Requirements
 
 - Windows 11, Windows Terminal >= 1.22 (sixel), PowerShell 5.1+
@@ -49,7 +59,7 @@ See [SETUP.md](SETUP.md).
 
     copland/   launcher, panel, state/hub generators, council helper, manual
     claude/    statusline scripts + Claude Code color theme
-    docs/      screenshots
+    docs/      screenshot, animated banner, architecture diagram (svg)
 
 ## License
 

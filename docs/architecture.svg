@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="'Departure Mono','Iosevka Term','JetBrains Mono',Consolas,'Courier New',monospace" font-size="15">
+  <style>
+    .fg{fill:#B8C4CE}.ac{fill:#8CABC6}.dim{fill:#4A5866}.warn{fill:#C2848F}
+    .box{fill:#000000;stroke:#4A5866;stroke-width:1}
+    .boxac{fill:#000000;stroke:#8CABC6;stroke-width:1}
+    .grp{fill:none;stroke:#1C232A;stroke-width:1;stroke-dasharray:3 4}
+    .ln{fill:none;stroke:#4A5866;stroke-width:1}
+    .flow{fill:none;stroke:#8CABC6;stroke-width:1;stroke-dasharray:4 6;animation:flow 2.4s linear infinite}
+    @keyframes flow{to{stroke-dashoffset:-20}}
+    .lab{font-size:11px}
+    .h{font-size:13px;letter-spacing:2px}
+  </style>
+  <rect width="1200" height="640" fill="#000000"/>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L8,4 L0,8" fill="none" stroke="#8CABC6" stroke-width="1"/>
+    </marker>
+    <marker id="ad" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L8,4 L0,8" fill="none" stroke="#4A5866" stroke-width="1"/>
+    </marker>
+  </defs>
+
+  <text class="dim h" x="40" y="34">COPLAND OS  --  ARCHITECTURE</text>
+  <text class="dim" x="40" y="56">. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</text>
+
+  <!-- ===== LEFT: life areas (plain folders) ===== -->
+  <rect class="grp" x="40" y="90" width="250" height="260"/>
+  <text class="dim h" x="52" y="110">LIFE AREAS  (folders)</text>
+  <g class="fg">
+    <text x="60" y="140">10_uni/</text>
+    <text x="60" y="164">20_work/</text>
+    <text x="60" y="188">30_venture/</text>
+    <text x="60" y="212">40_private/</text>
+    <text x="60" y="236">50_career/</text>
+    <text x="60" y="260">00_System/</text>
+  </g>
+  <g class="dim lab">
+    <text x="180" y="140">+ CLAUDE.md</text>
+    <text x="180" y="164">+ CLAUDE.md</text>
+    <text x="180" y="188">+ CLAUDE.md</text>
+    <text x="180" y="212">+ CLAUDE.md</text>
+    <text x="180" y="236">+ CLAUDE.md</text>
+    <text x="180" y="260">copland/</text>
+  </g>
+  <text class="dim lab" x="60" y="300">one folder per project,</text>
+  <text class="dim lab" x="60" y="318">one context file per folder.</text>
+  <text class="dim lab" x="60" y="336">no database. plain files.</text>
+
+  <!-- ===== CENTER: Windows Terminal ===== -->
+  <rect class="grp" x="340" y="90" width="520" height="260"/>
+  <text class="dim h" x="352" y="110">WINDOWS TERMINAL</text>
+
+  <!-- launcher -->
+  <rect class="boxac" x="360" y="128" width="300" height="110"/>
+  <text class="ac" x="374" y="150">copland.ps1</text>
+  <text class="dim lab" x="374" y="170">launcher [0-6] areas . [a-w] tools</text>
+  <text class="dim lab" x="374" y="188">overview [h] . ambient [w] . rain</text>
+  <text class="dim lab" x="374" y="206">direct start: mode prefix + alias</text>
+  <text class="dim lab" x="374" y="224">-> claude code in the right folder</text>
+
+  <!-- panel -->
+  <rect class="boxac" x="676" y="128" width="174" height="110"/>
+  <text class="ac" x="694" y="150">copland-panel.ps1</text>
+  <text class="dim lab" x="694" y="170">25% sidebar</text>
+  <text class="dim lab" x="694" y="188">clock . weather</text>
+  <text class="dim lab" x="694" y="206">limits . burn curve</text>
+  <text class="dim lab" x="694" y="224">sixel graphs page</text>
+
+  <!-- claude code session -->
+  <rect class="box" x="360" y="258" width="300" height="72"/>
+  <text class="fg" x="374" y="280">claude code session</text>
+  <text class="dim lab" x="374" y="300">statusline:  [wired] AREA | folder</text>
+  <text class="dim lab" x="374" y="318">hooks -> notify . theme copland.json</text>
+
+  <!-- statusline sensor -->
+  <rect class="box" x="676" y="258" width="174" height="72"/>
+  <text class="fg" x="694" y="280">statusline.ps1</text>
+  <text class="dim lab" x="694" y="300">sensor: model, ctx,</text>
+  <text class="dim lab" x="694" y="318">5h/7d limits -> cache</text>
+
+  <!-- ===== RIGHT: council ===== -->
+  <rect class="grp" x="910" y="90" width="250" height="260"/>
+  <text class="dim h" x="922" y="110">THE COUNCIL  /rat</text>
+  <rect class="box" x="930" y="128" width="210" height="40"/>
+  <text class="fg" x="944" y="153">copland-rat.ps1</text>
+  <g class="dim lab">
+    <text x="944" y="200">claude   (anthropic)</text>
+    <text x="944" y="220">gpt      (openai)</text>
+    <text x="944" y="240">nemotron (nvidia, free)</text>
+    <text x="944" y="260">llama    (groq, free)</text>
+    <text x="944" y="280">qwen     (alibaba, free)</text>
+  </g>
+  <text class="dim lab" x="944" y="312">same question, in parallel.</text>
+  <text class="dim lab" x="944" y="330">synthesis + where they disagree.</text>
+
+  <!-- ===== BOTTOM: generators ===== -->
+  <rect class="grp" x="40" y="390" width="1120" height="210"/>
+  <text class="dim h" x="52" y="410">GENERATORS  (plain files in, plain files out)</text>
+
+  <rect class="box" x="60" y="430" width="260" height="70"/>
+  <text class="fg" x="74" y="452">copland-state.ps1</text>
+  <text class="dim lab" x="74" y="472">scans folders + CLAUDE.md headers</text>
+  <text class="dim lab" x="74" y="490">every commit (post-commit hook)</text>
+
+  <rect class="boxac" x="370" y="430" width="220" height="70"/>
+  <text class="ac" x="384" y="452">STATE.md</text>
+  <text class="dim lab" x="384" y="472">projects . aliases . links</text>
+  <text class="dim lab" x="384" y="490">deadlines . open items</text>
+
+  <rect class="box" x="630" y="430" width="250" height="70"/>
+  <text class="fg" x="644" y="452">copland-hub.ps1</text>
+  <text class="dim lab" x="644" y="472">terminal dashboard +</text>
+  <text class="dim lab" x="644" y="490">self-contained hub.html</text>
+
+  <rect class="box" x="940" y="430" width="200" height="70"/>
+  <text class="fg" x="954" y="452">copland-shared.ps1</text>
+  <text class="dim lab" x="954" y="472">colors . session index</text>
+  <text class="dim lab" x="954" y="490">jsonl parser . cache</text>
+
+  <text class="dim lab" x="60" y="540">the AI reads your whole world in one file:</text>
+  <text class="ac lab" x="60" y="558">"we work on X"  -->  STATE.md alias  -->  project CLAUDE.md  -->  session starts where you left off.</text>
+  <text class="dim lab" x="60" y="586">black #000000 . text #B8C4CE . accent #8CABC6 . dim #4A5866 . warn #C2848F . pure ASCII . no CRT</text>
+
+  <!-- ===== ARROWS ===== -->
+  <!-- areas -> launcher -->
+  <path class="flow" d="M290,183 L360,183" marker-end="url(#a)"/>
+  <!-- launcher -> claude session -->
+  <path class="flow" d="M510,238 L510,258" marker-end="url(#a)"/>
+  <!-- session -> statusline sensor -->
+  <path class="flow" d="M660,294 L676,294" marker-end="url(#a)"/>
+  <!-- sensor -> panel -->
+  <path class="flow" d="M760,258 L760,238" marker-end="url(#a)"/>
+  <!-- session -> rat -->
+  <path class="ln" d="M510,330 L510,342 L900,342 L900,148 L930,148" marker-end="url(#ad)"/>
+  <text class="dim lab" x="870" y="338">/rat</text>
+  <!-- areas -> state generator -->
+  <path class="flow" d="M165,350 L165,430" marker-end="url(#a)"/>
+  <!-- state gen -> STATE.md -->
+  <path class="flow" d="M320,465 L370,465" marker-end="url(#a)"/>
+  <!-- STATE.md -> hub -->
+  <path class="flow" d="M590,465 L630,465" marker-end="url(#a)"/>
+  <!-- STATE.md -> claude session (up) -->
+  <path class="ln" d="M470,430 L470,360 L440,360 L440,330" marker-end="url(#ad)"/>
+  <text class="dim lab" x="478" y="378">1 read</text>
+  <!-- shared -> panel / launcher (dim) -->
+  <path class="ln" d="M1040,430 L1040,370 L760,370 L760,330" marker-end="url(#ad)"/>
+  <!-- panel -> launcher overview (dim) -->
+  <path class="ln" d="M676,160 L660,160" marker-end="url(#ad)"/>
+</svg>
