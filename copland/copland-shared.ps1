@@ -27,6 +27,8 @@ if (-not $env:LOCALAPPDATA) {
 if (-not $env:TEMP) { $env:TEMP = [IO.Path]::GetTempPath().TrimEnd('/', '\') }
 $OD    = if ($env:COPLAND_ROOT) { $env:COPLAND_ROOT } else { Join-Path $env:USERPROFILE 'OneDrive' }
 $PSExe = if ($IsWin) { 'powershell' } else { 'pwsh' }
+# claude code benennt session-ordner nach dem pfad (nicht-alphanumerisch -> '-'), z.b. c--users-me-onedrive-10-uni
+$ODMangled = (($OD -replace '[^A-Za-z0-9]', '-') + '-').ToLower()
 # datei/url mit dem systemstandard oeffnen (explorer / open / xdg-open)
 function Open-Item([string]$p) {
     if ($IsWin) { Start-Process $p }

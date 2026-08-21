@@ -22,6 +22,16 @@ launcher knows the areas, every project carries its context, and a single genera
 file tells the AI what is going on everywhere. You press one key and are back inside
 the right project with the right context -- nothing to explain.
 
+## First run: let Claude build your structure
+
+Open this repo in Claude Code (`claude` inside the cloned folder). The repo's
+`CLAUDE.md` tells Claude to offer a guided setup: it scans your home and cloud
+folders **read-only**, proposes life areas and a home for every existing project
+as a table, and -- only after you say go -- creates the folders, one `CLAUDE.md`
+per project, the root constitution, the launcher, and `STATE.md`. Nothing is
+moved without a row you confirmed; nothing is ever deleted. Say `/setup` to start
+it by hand.
+
 ## What it is
 
 Copland OS turns Windows Terminal + PowerShell + [Claude Code](https://claude.com/claude-code)
@@ -58,10 +68,11 @@ to know where you are. No database, no daemon, no framework.
 
 ## Skills (built in)
 
-Three Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skills/`:
+Four Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skills/`:
 
 | skill | what it does |
 |---|---|
+| `/setup` | first run: scan (read-only), propose areas + project homes, build folders and `CLAUDE.md`s, install everything |
 | `/briefing` | calendar, mails that need action, deadlines, open items, last work -- one screen |
 | `/dual` | same task to Claude and Codex (GPT) in parallel, one synthesised answer |
 | `/council` | same question to Claude, GPT, Nemotron, Llama, Qwen -- synthesis + where they disagree (free tiers) |
@@ -81,7 +92,8 @@ See [SETUP.md](SETUP.md).
 ## Repository layout
 
     copland/   launcher, panel, state/hub generators, council helper, manual
-    claude/    statusline scripts, Claude Code color theme, skills/ (briefing, dual, council)
+    claude/    statusline scripts, Claude Code color theme, skills/ (setup, briefing, dual, council)
+    templates/ ROOT-CLAUDE.md (constitution), PROJECT-CLAUDE.md (per-project context)
     setup/     macos.sh + wezterm.lua
     docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
 

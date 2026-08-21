@@ -4,6 +4,13 @@ Everything lives under one root folder that contains your life areas
 (`00_System`, `10_uni`, `20_work`, ...). Default root: `~/OneDrive`.
 Set `COPLAND_ROOT` to use any other folder.
 
+## The easy way (any OS)
+
+Open the cloned repo in Claude Code and say `/setup` (or just answer yes when it
+offers). It scans your folders read-only, proposes the structure as a table and
+builds it after your go -- including everything below. The manual steps are here
+for reference and for people who prefer to do it themselves.
+
 ## Windows (primary)
 
 1. Create your life-area folders, e.g. in OneDrive or any root:

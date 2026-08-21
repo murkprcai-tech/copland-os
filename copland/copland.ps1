@@ -98,7 +98,7 @@ function Get-AreaStats {
     $stats = @{}
     foreach ($ar in $script:areas) { $stats[$ar.dir] = @{ newest = $null; s7 = 0 } }
     foreach ($prop in $idx.sessions.PSObject.Properties) {
-        $n = $prop.Name -replace '^c--users-marep-onedrive-', ''
+        $n = $prop.Name.ToLower() -replace ('^' + [regex]::Escape($ODMangled)), ''
         foreach ($ar in $script:areas) {
             if ($n -like "$(($ar.dir -replace '_', '-').ToLower())*") {
                 $t = [datetime]$prop.Value.newest
