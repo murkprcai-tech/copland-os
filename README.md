@@ -22,6 +22,20 @@ launcher knows the areas, every project carries its context, and a single genera
 file tells the AI what is going on everywhere. You press one key and are back inside
 the right project with the right context -- nothing to explain.
 
+## Install: one line
+
+Paste into a terminal -- that is all. It fetches git + Claude Code if missing,
+clones this repo to `~/copland-os` and opens Claude inside it:
+
+| | |
+|---|---|
+| **Windows** (PowerShell) | `irm https://raw.githubusercontent.com/murkprcai-tech/copland-os/main/get.ps1 \| iex` |
+| **macOS / Linux** | `curl -fsSL https://raw.githubusercontent.com/murkprcai-tech/copland-os/main/get.sh \| bash` |
+
+Claude then **asks** before it scans anything (read-only), proposes your life
+areas as a table, and builds folders, context files, launcher and panel only
+after you say go. Nothing is moved without your ok, nothing is ever deleted.
+
 ## First run: let Claude build your structure
 
 Open this repo in Claude Code (`claude` inside the cloned folder). The repo's
