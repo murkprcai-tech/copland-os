@@ -100,6 +100,31 @@ if (-not $NoClaude) {
         if ($settings.PSObject.Properties.Name -contains 'statusLine') { $settings.statusLine = $sl }
         else { $settings | Add-Member -NotePropertyName statusLine -NotePropertyValue $sl }
         if (-not ($settings.PSObject.Properties.Name -contains 'outputStyle')) { $settings | Add-Member -NotePropertyName outputStyle -NotePropertyValue 'concise' }
+        # --- 4b hooks: guard (write-lock on taboo paths), audit log, toast/sound, vault recall.
+        #     merged into existing hooks -- other tools' hooks stay untouched. node is required.
+        if (Get-Command node -ErrorAction SilentlyContinue) {
+            $hooksDir = Join-Path $copDir 'hooks'
+            $wire = @(
+                @{ ev = 'PreToolUse';       js = 'copland-guard.js';        t = 5 },
+                @{ ev = 'PostToolUse';      js = 'copland-audit.js';        t = 5 },
+                @{ ev = 'Notification';     js = 'copland-notify.js';       t = 5 },
+                @{ ev = 'Stop';             js = 'copland-notify.js';       t = 5 },
+                @{ ev = 'UserPromptSubmit'; js = 'copland-vault-recall.js'; t = 8 }
+            )
+            if (-not ($settings.PSObject.Properties.Name -contains 'hooks')) { $settings | Add-Member -NotePropertyName hooks -NotePropertyValue ([pscustomobject]@{}) }
+            foreach ($w in $wire) {
+                $cmd = "node `"$(Join-Path $hooksDir $w.js)`""
+                $entry = [pscustomobject]@{ matcher = ''; hooks = @([pscustomobject]@{ type = 'command'; command = $cmd; timeout = $w.t }) }
+                $cur = @()
+                if ($settings.hooks.PSObject.Properties.Name -contains $w.ev) { $cur = @($settings.hooks.($w.ev)) }
+                if (-not ($cur | Where-Object { "$($_.hooks.command)" -like "*$($w.js)*" })) {
+                    $cur += $entry
+                    if ($settings.hooks.PSObject.Properties.Name -contains $w.ev) { $settings.hooks.($w.ev) = $cur }
+                    else { $settings.hooks | Add-Member -NotePropertyName $w.ev -NotePropertyValue $cur }
+                }
+            }
+            Dim "hooks registered (guard, audit, notify, vault-recall)"
+        } else { Warn 'node not found -- hooks (guard/audit/notify/vault-recall) not registered; install node and re-run' }
         if (Test-Path $setF) { Copy-Item $setF "$setF.copland-bak" -Force }
         $settings | ConvertTo-Json -Depth 20 | Set-Content $setF -Encoding utf8
         Dim "statusLine registered in settings.json (backup: settings.json.copland-bak)"

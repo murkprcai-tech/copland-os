@@ -189,3 +189,77 @@ function ConvertTo-BrailleChart([double[]]$vals, [int]$cellsW, [int]$cellsH, [do
     }
     , $lines
 }
+
+# --- spotify ueber die system-media-session (windows WinRT / macos osascript) ----------------
+# kein api-key, keine anmeldung: liest und steuert die laufende spotify-desktop-app.
+# Get-SpotifyNow  -> @{title;artist;album;playing;pos;len} oder $null
+# Invoke-SpotifyCtl 'toggle'|'next'|'prev'|'play'|'pause'
+$script:SpMediaInit = $false
+$script:SpAsTaskG = $null
+function Get-SpotifySession {
+    if (-not $IsWin) { return $null }
+    try {
+        if (-not $script:SpMediaInit) {
+            $script:SpMediaInit = $true
+            Add-Type -AssemblyName System.Runtime.WindowsRuntime -ErrorAction Stop
+            $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+            $script:SpAsTaskG = ([System.WindowsRuntimeSystemExtensions].GetMethods() |
+                Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq ('IAsyncOperation' + [char]96 + '1') })[0]
+        }
+        if (-not $script:SpAsTaskG) { return $null }
+        $tk = $script:SpAsTaskG.MakeGenericMethod([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]).Invoke(
+            $null, @([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()))
+        if (-not $tk.Wait(2000)) { return $null }
+        @($tk.Result.GetSessions()) | Where-Object { $_.SourceAppUserModelId -match 'Spotify' } | Select-Object -First 1
+    } catch { $null }
+}
+function Get-SpotifyNow {
+    if ($IsWin) {
+        try {
+            $ses = Get-SpotifySession
+            if (-not $ses) { return $null }
+            $tkP = $script:SpAsTaskG.MakeGenericMethod([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]).Invoke(
+                $null, @($ses.TryGetMediaPropertiesAsync()))
+            if (-not $tkP.Wait(2000)) { return $null }
+            $mp = $tkP.Result
+            $tl = $ses.GetTimelineProperties(); $pi = $ses.GetPlaybackInfo()
+            return @{ title = "$($mp.Title)"; artist = "$($mp.Artist)"; album = "$($mp.AlbumTitle)"
+                      playing = ("$($pi.PlaybackStatus)" -eq 'Playing')
+                      pos = [int]$tl.Position.TotalSeconds; len = [int]$tl.EndTime.TotalSeconds }
+        } catch { return $null }
+    } elseif ($IsMac) {
+        try {
+            $osa = 'tell application "System Events" to set ok to (name of processes) contains "Spotify"' + "`n" +
+                   'if not ok then return ""' + "`n" +
+                   'tell application "Spotify" to return (player state as string) & "|" & (name of current track) & "|" & (artist of current track) & "|" & (album of current track) & "|" & player position & "|" & ((duration of current track) / 1000)'
+            $out = & osascript -e $osa 2>$null
+            if (-not "$out") { return $null }
+            $pp = "$out" -split '\|'
+            if ($pp.Count -lt 6) { return $null }
+            return @{ title = $pp[1]; artist = $pp[2]; album = $pp[3]; playing = ($pp[0] -eq 'playing')
+                      pos = [int][double]$pp[4]; len = [int][double]$pp[5] }
+        } catch { return $null }
+    }
+    $null
+}
+function Invoke-SpotifyCtl([string]$cmd) {
+    if ($IsWin) {
+        $ses = Get-SpotifySession
+        if (-not $ses) { return $false }
+        try {
+            switch ($cmd) {
+                'toggle' { $null = $ses.TryTogglePlayPauseAsync() }
+                'next'   { $null = $ses.TrySkipNextAsync() }
+                'prev'   { $null = $ses.TrySkipPreviousAsync() }
+                'play'   { $null = $ses.TryPlayAsync() }
+                'pause'  { $null = $ses.TryPauseAsync() }
+            }
+            return $true
+        } catch { return $false }
+    } elseif ($IsMac) {
+        $map = @{ toggle = 'playpause'; next = 'next track'; prev = 'previous track'; play = 'play'; pause = 'pause' }
+        if (-not $map[$cmd]) { return $false }
+        try { & osascript -e "tell application `"Spotify`" to $($map[$cmd])" 2>$null; return $true } catch { return $false }
+    }
+    $false
+}

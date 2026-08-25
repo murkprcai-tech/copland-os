@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>vault</title>
+<style>
+  :root { --bg:#000000; --fg:#B8C4CE; --ac:#8CABC6; --dim:#4A5866; --warn:#C2848F; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg); font:13px/1.5 "Departure Mono","Iosevka Term","JetBrains Mono",Consolas,monospace; overflow:hidden; }
+  #top { position:fixed; left:0; right:0; top:0; height:40px; display:flex; align-items:center; gap:18px; padding:0 18px; border-bottom:1px dotted var(--dim); background:var(--bg); z-index:2; }
+  #top b { color:var(--ac); font-weight:normal; letter-spacing:.08em; }
+  #top .dim { color:var(--dim); }
+  #q { background:transparent; border:0; border-bottom:1px solid var(--dim); color:var(--fg); font:inherit; width:260px; outline:none; padding:2px 0; }
+  #q:focus { border-bottom-color:var(--ac); }
+  #wrap { position:absolute; top:40px; bottom:0; left:0; right:0; display:flex; }
+  #cv { flex:1 1 0; min-width:0; height:100%; display:block; cursor:crosshair; }
+  #side { width:38%; min-width:320px; max-width:640px; border-left:1px dotted var(--dim); padding:18px 22px; overflow:auto; }
+  #side h1 { color:var(--ac); font-size:13px; font-weight:normal; letter-spacing:.06em; margin-bottom:2px; }
+  #side .meta { color:var(--dim); margin-bottom:14px; }
+  #side .body { white-space:pre-wrap; }
+  #side .body .h { color:var(--ac); }
+  #side .body .dim { color:var(--dim); }
+  #side a { color:var(--ac); text-decoration:none; cursor:pointer; }
+  #side a:hover { text-decoration:underline dotted; }
+  #side .ctx { margin-top:18px; border-top:1px dotted var(--dim); padding-top:10px; color:var(--dim); }
+  #side .ctx div { margin:2px 0; }
+  #side .empty { color:var(--dim); }
+  #tip { position:fixed; pointer-events:none; background:var(--bg); border:1px dotted var(--dim); color:var(--fg); padding:6px 10px; max-width:360px; display:none; z-index:3; }
+  #tip .dim { color:var(--dim); }
+  #foot { position:fixed; left:18px; bottom:8px; color:var(--dim); font-size:12px; z-index:2; }
+</style>
+</head>
+<body>
+<div id="top"><b>VAULT</b><span class="dim" id="count"></span><input id="q" placeholder="filter ..." autocomplete="off"><span class="dim">stand __STAND__</span></div>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="side"><div class="empty">knoten anklicken -- die notiz erscheint hier. ziehen verschiebt, rad zoomt, doppelklick zentriert.</div></div>
+</div>
+<div id="tip"></div>
+<div id="foot">knotengroesse = anzahl links &nbsp;|&nbsp; gestrichelt = tag-nachbarschaft &nbsp;|&nbsp; esc = auswahl loeschen &nbsp;|&nbsp; f = einpassen</div>
+<script>
+const DATA = /*__DATA__*/[];
+const C = { bg:'#000000', fg:'#B8C4CE', ac:'#8CABC6', dim:'#4A5866', warn:'#C2848F' };
+const byId = {}; DATA.forEach(n => { byId[n.id] = n; n.in = []; });
+DATA.forEach(n => n.out.forEach(o => { if (byId[o]) byId[o].in.push(n.id); }));
+const edges = [];
+DATA.forEach(n => n.out.forEach(o => { if (byId[o]) edges.push([n.id, o]); }));
+// tag-nachbarschaft (schwach): gleiche tags ziehen sich an
+const tagEdges = [];
+for (let i = 0; i < DATA.length; i++) for (let j = i + 1; j < DATA.length; j++) {
+  const a = DATA[i], b = DATA[j];
+  if (a.tags.some(t => b.tags.includes(t)) && !a.out.includes(b.id) && !b.out.includes(a.id)) tagEdges.push([a.id, b.id]);
+}
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const side = document.getElementById('side'), tip = document.getElementById('tip'), q = document.getElementById('q');
+document.getElementById('count').textContent = DATA.length + ' notizen, ' + edges.length + ' links';
+let W, H, scale = 1, ox = 0, oy = 0, sel = null, hover = null, drag = null, panning = null, filter = '';
+function resize() { W = cv.width = cv.clientWidth * devicePixelRatio; H = cv.height = cv.clientHeight * devicePixelRatio; }
+window.addEventListener('resize', resize); resize();
+// startlage: kreis, dann kraefte
+DATA.forEach((n, i) => { const a = i / DATA.length * Math.PI * 2, r = Math.min(W, H) * 0.32; n.x = W / 2 + Math.cos(a) * r; n.y = H / 2 + Math.sin(a) * r; n.vx = 0; n.vy = 0; n.deg = n.out.length + n.in.length; });
+function radius(n) { return (4 + Math.sqrt(n.deg) * 3) * devicePixelRatio; }
+let heat = 1;
+function step() {
+  const k = 0.9 * devicePixelRatio;
+  for (const a of DATA) for (const b of DATA) if (a !== b) {
+    let dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2);
+    const f = (k * 400 * devicePixelRatio) / d2 * 60;
+    a.vx += dx / d * f * heat; a.vy += dy / d * f * heat;
+  }
+  const spring = (e, len, s) => { const a = byId[e[0]], b = byId[e[1]]; let dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01; const f = (d - len) * s; a.vx += dx / d * f; a.vy += dy / d * f; b.vx -= dx / d * f; b.vy -= dy / d * f; };
+  edges.forEach(e => spring(e, 150 * devicePixelRatio, 0.015));
+  tagEdges.forEach(e => spring(e, 220 * devicePixelRatio, 0.004));
+  for (const n of DATA) {
+    n.vx += (W / 2 - n.x) * 0.0005; n.vy += (H / 2 - n.y) * 0.0005;
+    if (n === drag) { n.vx = n.vy = 0; continue; }
+    n.vx *= 0.82; n.vy *= 0.82; n.x += n.vx; n.y += n.vy;
+  }
+  heat = Math.max(0.08, heat * 0.997);
+}
+function vis(n) { return !filter || n.name.toLowerCase().includes(filter) || n.tags.some(t => t.includes(filter)); }
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(scale, 0, 0, scale, ox, oy);
+  const near = new Set(); if (sel) { near.add(sel.id); sel.out.forEach(o => near.add(o)); sel.in.forEach(o => near.add(o)); }
+  ctx.lineWidth = devicePixelRatio;
+  ctx.setLineDash([3 * devicePixelRatio, 5 * devicePixelRatio]); ctx.strokeStyle = C.dim; ctx.globalAlpha = 0.35;
+  tagEdges.forEach(e => { const a = byId[e[0]], b = byId[e[1]]; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+  edges.forEach(e => { const a = byId[e[0]], b = byId[e[1]]; const hi = sel && (a === sel || b === sel); ctx.strokeStyle = hi ? C.ac : C.dim; ctx.globalAlpha = sel && !hi ? 0.25 : 0.8; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); });
+  ctx.globalAlpha = 1;
+  ctx.font = (12 * devicePixelRatio) + 'px "Departure Mono","JetBrains Mono",Consolas,monospace'; ctx.textBaseline = 'middle';
+  for (const n of DATA) {
+    const r = radius(n), on = n === sel || n === hover, dimmed = (sel && !near.has(n.id)) || !vis(n);
+    ctx.globalAlpha = dimmed ? 0.25 : 1;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = on ? C.ac : C.bg; ctx.fill(); ctx.strokeStyle = on ? C.ac : (n.deg ? C.fg : C.dim); ctx.stroke();
+    if (on || n.deg >= 3 || scale > 1.3 || DATA.length < 40) { ctx.fillStyle = on ? C.ac : (dimmed ? C.dim : C.fg); ctx.fillText(n.name, n.x + r + 5 * devicePixelRatio, n.y); }
+  }
+  ctx.globalAlpha = 1;
+}
+function fit() { if (!DATA.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const n of DATA) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); } const pad = 140 * devicePixelRatio; scale = Math.min(2, Math.max(0.3, Math.min(W / (x1 - x0 + pad * 2), H / (y1 - y0 + pad * 2)))); ox = W / 2 - (x0 + x1) / 2 * scale; oy = H / 2 - (y0 + y1) / 2 * scale; }
+let frames = 0;
+function loop() { step(); draw(); frames++; if (frames === 90 || frames === 240) fit(); requestAnimationFrame(loop); } loop();
+function toWorld(ev) { const b = cv.getBoundingClientRect(); return { x: ((ev.clientX - b.left) * devicePixelRatio - ox) / scale, y: ((ev.clientY - b.top) * devicePixelRatio - oy) / scale }; }
+function hit(p) { let best = null, bd = 1e9; for (const n of DATA) { const d = Math.hypot(n.x - p.x, n.y - p.y); if (d < radius(n) + 8 * devicePixelRatio && d < bd) { best = n; bd = d; } } return best; }
+cv.addEventListener('mousedown', ev => { const n = hit(toWorld(ev)); if (n) { drag = n; heat = Math.max(heat, 0.3); } else panning = { x: ev.clientX, y: ev.clientY, ox, oy }; });
+window.addEventListener('mousemove', ev => {
+  if (drag) { const p = toWorld(ev); drag.x = p.x; drag.y = p.y; return; }
+  if (panning) { ox = panning.ox + (ev.clientX - panning.x) * devicePixelRatio; oy = panning.oy + (ev.clientY - panning.y) * devicePixelRatio; return; }
+  const n = hit(toWorld(ev)); hover = n;
+  if (n) { tip.style.display = 'block'; tip.style.left = (ev.clientX + 14) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; tip.innerHTML = '<b>' + esc(n.name) + '</b><br><span class="dim">' + n.in.length + ' eingehend, ' + n.out.length + ' ausgehend' + (n.tags.length ? ' &nbsp; #' + n.tags.join(' #') : '') + '</span><br>' + esc(firstPara(n.text)); }
+  else tip.style.display = 'none';
+});
+window.addEventListener('mouseup', ev => { if (drag) { const n = drag; drag = null; select(n); } panning = null; });
+cv.addEventListener('wheel', ev => { ev.preventDefault(); const p = toWorld(ev); const f = ev.deltaY < 0 ? 1.12 : 1 / 1.12; scale = Math.min(4, Math.max(0.3, scale * f)); ox = (ev.clientX - cv.getBoundingClientRect().left) * devicePixelRatio - p.x * scale; oy = (ev.clientY - cv.getBoundingClientRect().top) * devicePixelRatio - p.y * scale; }, { passive: false });
+cv.addEventListener('dblclick', ev => { const n = hit(toWorld(ev)); if (n) { ox = W / 2 - n.x * scale; oy = H / 2 - n.y * scale; } });
+window.addEventListener('keydown', ev => { if (ev.key === 'f' && document.activeElement !== q) fit(); if (ev.key === 'Escape') { sel = null; side.innerHTML = '<div class="empty">knoten anklicken -- die notiz erscheint hier.</div>'; q.blur(); } });
+q.addEventListener('input', () => { filter = q.value.trim().toLowerCase(); });
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function firstPara(t) { const l = t.split('\n').filter(x => x.trim() && !x.startsWith('#')); return (l[0] || '').slice(0, 160); }
+function render(text) {
+  let code = false;
+  return text.split('\n').map(ln => {
+    if (ln.startsWith('```')) { code = !code; return '<span class="dim">' + esc(ln) + '</span>'; }
+    if (code) return '<span class="dim">' + esc(ln) + '</span>';
+    if (/^#/.test(ln)) return '<span class="h">' + esc(ln.replace(/^#+\s*/, '')) + '</span>';
+    let h = esc(ln).replace(/\[\[([^\]\|#]+)(?:[^\]]*)\]\]/g, (m, n) => byId[n.trim().toLowerCase()] ? '<a data-id="' + esc(n.trim().toLowerCase()) + '">[[' + esc(n) + ']]</a>' : '<span class="dim">[[' + esc(n) + ']]</span>');
+    h = h.replace(/(^|\s)(#[a-z0-9_\-\/]+)/g, '$1<span class="dim">$2</span>');
+    return h;
+  }).join('\n');
+}
+function select(n) {
+  sel = n; heat = Math.max(heat, 0.2);
+  const lk = (ids, head) => ids.length ? '<div>' + head + '</div>' + ids.map(i => '<div>&nbsp;&nbsp;<a data-id="' + esc(i) + '">' + esc(byId[i] ? byId[i].name : i) + '</a></div>').join('') : '';
+  side.innerHTML = '<h1>' + esc(n.name) + '</h1><div class="meta">' + esc(n.date) + (n.dir && n.dir !== 'vault' ? ' &nbsp; ' + esc(n.dir) : '') + (n.tags.length ? ' &nbsp; #' + n.tags.map(esc).join(' #') : '') + '</div><div class="body">' + render(n.text) + '</div><div class="ctx">' + lk(n.in, '&lt;- eingehend') + lk(n.out, '-&gt; ausgehend') + '</div>';
+  side.scrollTop = 0;
+  side.querySelectorAll('a[data-id]').forEach(a => a.addEventListener('click', () => { const t = byId[a.dataset.id]; if (t) { select(t); ox = W / 2 - t.x * scale; oy = H / 2 - t.y * scale; } }));
+}
+</script>
+</body>
+</html>

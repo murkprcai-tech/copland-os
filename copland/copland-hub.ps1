@@ -1,8 +1,8 @@
-# COPLAND OS -- Hub-Generator v2 (kommandozentrale)
+﻿# COPLAND OS -- Hub-Generator v2 (kommandozentrale)
 # baut hub.html: gauges (limits), balance-donut, aktivitaets-heatmap,
 # lebens-graph (canvas, force-directed), commit/werkstatt-timeline,
 # bereiche/projekte, offene punkte, skills. alles inline, kein internet.
-# aufruf: [h] -> [b] im launcher. 40_private: nur ordnernamen (ausser assistent).
+# aufruf: [h] -> [b] im launcher. 40_private: nur ordnernamen. 60_assistent: bereich = projekt.
 
 $ErrorActionPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'copland-shared.ps1')
@@ -11,7 +11,7 @@ $out = Join-Path $CoplandDir 'hub.html'
 $areas = @(
     @{ name = 'uni'; dir = '10_uni' }, @{ name = 'work'; dir = '20_work' },
     @{ name = 'venture'; dir = '30_venture' }, @{ name = 'private'; dir = '40_private' },
-    @{ name = 'career'; dir = '50_career' }, @{ name = 'system'; dir = '00_System' }
+    @{ name = 'career'; dir = '50_career' }, @{ name = 'assistent'; dir = '60_assistent'; self = $true }, @{ name = 'system'; dir = '00_System' }
 )
 
 # --- limits aus den panel-caches ---
@@ -49,8 +49,10 @@ $balance = @()
 foreach ($a in $areas) {
     $projList = @()
     $bal7 = 0
-    foreach ($p in @(Get-ChildItem (Join-Path $OD $a.dir) -Directory | Where-Object { $_.Name -notmatch '^[_.]' } | Sort-Object Name)) {
-        $privat = ($a.dir -eq '40_private' -and $p.Name -ne 'assistent')
+    $items = if ($a.self) { @(Get-Item (Join-Path $OD $a.dir)) }
+             else { @(Get-ChildItem (Join-Path $OD $a.dir) -Directory | Where-Object { $_.Name -notmatch '^[_.]' -and $_.Name -ne 'log' } | Sort-Object Name) }
+    foreach ($p in $items) {
+        $privat = ($a.dir -eq '40_private')
         $zweck = ''; $stand = ''
         $cmd = Join-Path $p.FullName 'CLAUDE.md'
         if (-not $privat -and (Test-Path $cmd)) {
@@ -77,7 +79,7 @@ foreach ($a in $areas) {
         if ($stand.Length -gt 160) { $stand = $stand.Substring(0, 159) + '~' }
         $projList += @{ name = $p.Name; days = $days; zweck = $zweck; stand = $stand; s30 = $s30; privat = [bool]$privat }
     }
-    $areaData += @{ name = $a.name; dir = $a.dir; projects = $projList }
+    $areaData += @{ name = $a.name; dir = $a.dir; ebene = $(if ($a.dir -match '^[1-5]0_') { 'lebensbereiche' } else { 'werkzeuge' }); projects = $projList }
     $balance += @{ name = $a.name; count = $bal7 }
 }
 
@@ -104,10 +106,23 @@ foreach ($l in (Get-Content (Join-Path $SysDir 'offene-punkte.md') -Encoding utf
 $skills = @(Get-ChildItem (Join-Path $ClaudeHome 'skills') -Directory | ForEach-Object { "/$($_.Name)" }) +
           @(Get-ChildItem (Join-Path $ClaudeHome 'commands') -File -Filter *.md | ForEach-Object { "/$($_.BaseName)" })
 
+# --- verbindungen (70_mcperbindungen.md, ohne live-check -- der laeuft in copland-mcp.ps1) ---
+$mcp = @{ ok = 0; auth = 0; off = 0; list = @() }
+$vf = Join-Path $OD '70_mcp/verbindungen.md'
+if (Test-Path $vf) {
+    foreach ($vl in (Get-Content $vf -Encoding utf8)) {
+        if ($vl -notmatch '^\|') { continue }
+        $vc = @(($vl.Trim().Trim('|') -split '\|') | ForEach-Object { $_.Trim() })
+        if ($vc.Count -lt 4 -or $vc[0] -eq 'name' -or $vc[0] -match '^-+$') { continue }
+        $vs = $vc[3].ToLower()
+        if ($vs -eq 'laeuft') { $mcp.ok++ } elseif ($vs -eq 'anmeldung noetig') { $mcp.auth++; $mcp.list += $vc[0] } elseif ($vs -in @('aus', 'ungetestet')) { $mcp.off++ }
+    }
+}
+
 $data = @{
     generated = (Get-Date -Format 'ddd dd.MM. HH:mm').ToLower()
     limits = $limits; heat = $heat; areas = $areaData; balance = $balance
-    commits = $commits; werk = $werk; offen = $offen; skills = $skills
+    commits = $commits; werk = $werk; offen = $offen; skills = $skills; mcp = $mcp
 } | ConvertTo-Json -Depth 6 -Compress
 
 $template = @'
@@ -163,7 +178,8 @@ $template = @'
 <div class="sep">..........................................................................</div>
 <div class="row">
   <div style="min-width:420px"><h2>offene punkte</h2><div id="offen"></div></div>
-  <div><h2>skills</h2><div class="dim" id="skills"></div></div>
+  <div><h2>skills</h2><div class="dim" id="skills"></div>
+    <h2 style="margin-top:14px">verbindungen <span class="dim">70_mcp, launcher [p]</span></h2><div id="mcp"></div></div>
 </div>
 
 <div class="sep">..........................................................................</div>
@@ -311,8 +327,9 @@ document.getElementById('gauges').innerHTML = g || '<span class="dim">keine limi
 // --- bereiche/projekte als karten ---
 (function(){
   const el=document.getElementById('areas');
-  let s='';
+  let s='', ebene='';
   D.areas.forEach(a=>{
+    if (a.ebene!==ebene){ ebene=a.ebene; s+='<div class="dim" style="margin-top:22px;letter-spacing:.2em;text-transform:uppercase;font-size:11px">'+ebene+'</div>'; }
     s+='<h2 style="margin-top:14px">'+a.name+' <span class="dim">'+a.dir+' · '+a.projects.length+' projekte</span></h2><div class="grid">';
     a.projects.forEach(p=>{
       const rel = p.days===0?'heute':p.days===1?'gestern':'vor '+p.days+'t';
@@ -338,6 +355,10 @@ document.getElementById('gauges').innerHTML = g || '<span class="dim">keine limi
   if (cur) s+='</ul>';
   document.getElementById('offen').innerHTML=s;
   document.getElementById('skills').textContent=(D.skills||[]).join('   ');
+  const m=D.mcp||{};
+  let ms='<span>'+(m.ok||0)+' laufen</span> <span class="dim">&middot;</span> <span class="'+((m.auth||0)>0?'warn':'dim')+'">'+(m.auth||0)+' anmeldung noetig</span> <span class="dim">&middot; '+(m.off||0)+' aus</span>';
+  if ((m.list||[]).length) ms+='<div class="warn">'+m.list.join(', ')+'</div>';
+  document.getElementById('mcp').innerHTML=ms;
 })();
 </script>
 </body></html>

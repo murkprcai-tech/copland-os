@@ -1,9 +1,9 @@
-# COPLAND OS -- State-Generator
+﻿# COPLAND OS -- State-Generator
 # schreibt 00_System\STATE.md: maschinenzustand der master-umgebung in EINEM read.
 # quelle der wahrheit: die projekt-CLAUDE.mds (kopfzeile: alias/status/Verbunden/Frist).
 # trigger: launcher-boot, git post-commit, /merken. staleness-guard: laeuft nur,
 # wenn STATE.md aelter 6h ODER eine CLAUDE.md/offene-punkte.md juenger ist.
-# 40_private: nur ordnernamen, ausser assistent (verfassungs-regel 8).
+# 40_private: nur ordnernamen (verfassungs-regel 8). 60_assistent: bereich = projekt (kein unterordner-scan).
 
 $ErrorActionPreference = 'SilentlyContinue'
 # plattform + parser + session-index (EIN scan) aus copland-shared.ps1
@@ -14,7 +14,7 @@ $out = Join-Path $SysDir 'STATE.md'
 if (Test-Path $out) {
     $stateT = (Get-Item $out).LastWriteTime
     if (((Get-Date) - $stateT).TotalHours -lt 6) {
-        $newer = @(Get-ChildItem (Join-Path $OD '10_uni'), (Join-Path $OD '20_work'), (Join-Path $OD '30_venture'), (Join-Path $OD '50_career'), $SysDir `
+        $newer = @(Get-ChildItem (Join-Path $OD '10_uni'), (Join-Path $OD '20_work'), (Join-Path $OD '30_venture'), (Join-Path $OD '50_career'), (Join-Path $OD '60_assistent'), $SysDir `
                 -Recurse -Depth 2 -Filter 'CLAUDE.md' | Where-Object { $_.LastWriteTime -gt $stateT })
         $op2 = Get-Item (Join-Path $SysDir 'offene-punkte.md')
         if (-not $newer -and $op2.LastWriteTime -le $stateT) { exit }
@@ -23,7 +23,7 @@ if (Test-Path $out) {
 
 $areas = @(
     @{ dir = '10_uni' }, @{ dir = '20_work' }, @{ dir = '30_venture' },
-    @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '00_System' }
+    @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '60_assistent'; self = $true }, @{ dir = '00_System' }
 )
 
 # session-aktivitaet aus dem gemeinsamen index
@@ -36,14 +36,20 @@ foreach ($prop in $idx.sessions.PSObject.Properties) {
 $L = New-Object System.Collections.Generic.List[string]
 $ruhend = @(); $kanten = @(); $fristen = @(); $ohneKontext = 0; $projekte = 0
 
+$ebeneGesetzt = ''
 foreach ($a in $areas) {
-    foreach ($p in @(Get-ChildItem (Join-Path $OD $a.dir) -Directory |
-            Where-Object { $_.Name -notmatch '^[_.]' } | Sort-Object Name)) {
+    # ebenen-marker (verfassung): 10-50 = lebensbereiche, 00/60/70 = werkzeuge. eine zeile je gruppe, kein extra scan.
+    $ebene = if ($a.dir -match '^[1-5]0_') { 'lebensbereiche' } else { 'werkzeuge' }
+    if ($ebene -ne $ebeneGesetzt) { $L.Add("# -- $ebene"); $ebeneGesetzt = $ebene }
+    # self = bereich ist selbst das projekt (60_assistent), kein unterordner-scan
+    $items = if ($a.self) { @(Get-Item (Join-Path $OD $a.dir)) }
+             else { @(Get-ChildItem (Join-Path $OD $a.dir) -Directory | Where-Object { $_.Name -notmatch '^[_.]' -and $_.Name -ne 'log' } | Sort-Object Name) }
+    foreach ($p in $items) {
         $projekte++
-        $rel = "$($a.dir)/$($p.Name)"
-        $privat = ($a.dir -eq '40_private' -and $p.Name -ne 'assistent')
+        $rel = if ($p.Name -eq $a.dir) { $a.dir } else { "$($a.dir)/$($p.Name)" }
+        $privat = ($a.dir -eq '40_private')
         $cmd = Join-Path $p.FullName 'CLAUDE.md'
-        $alias = ''; $stand = ''; $status = ''
+        $alias = ''; $stand = ''; $standDate = ''; $status = ''
         if (-not $privat -and (Test-Path $cmd)) {
             $sec = ''
             foreach ($ln in (Get-Content $cmd -Encoding utf8)) {
@@ -56,7 +62,11 @@ foreach ($a in $areas) {
                 if ($ln -match '^Frist:\s*(\d{4}-\d{2}-\d{2})\s*(.*)') {
                     $fristen += "$($Matches[1]) $($Matches[2]) ($rel)"
                 }
-                if ($sec -eq 'stand' -and $ln -match '^\s*-\s*(.+)') { $stand = $Matches[1] }
+                if ($sec -eq 'stand' -and $ln -match '^\s*-\s*(.+)') {
+                    # neuester datierter eintrag gewinnt (reihenfolge egal)
+                    $cand = $Matches[1]; $cd = if ($cand -match '(\d{4}-\d{2}-\d{2})') { $Matches[1] } else { '' }
+                    if (-not $stand -or $cd -ge $standDate) { $stand = $cand; $standDate = $cd }
+                }
             }
         }
         # aktivitaet
@@ -111,11 +121,11 @@ if ($fristen) {
     [void]$B.AppendLine('')
 }
 # erinnerungen des assistenten als fristen-quelle
-$erin = Join-Path $OD '40_private/assistent/erinnerungen.md'
+$erin = Join-Path $OD '60_assistent/erinnerungen.md'
 if (Test-Path $erin) {
     $eLines = @(Get-Content $erin -Encoding utf8 | Where-Object { $_ -match '^\s*-\s*\[(\d{4}-\d{2}-\d{2})\]' })
     if ($eLines) {
-        [void]$B.AppendLine('[erinnerungen] (aus 40_private/assistent/erinnerungen.md)')
+        [void]$B.AppendLine('[erinnerungen] (aus 60_assistent/erinnerungen.md)')
         foreach ($el in $eLines) { [void]$B.AppendLine(($el -replace '^\s*-\s*', '')) }
         [void]$B.AppendLine('')
     }

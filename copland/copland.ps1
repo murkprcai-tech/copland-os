@@ -1,4 +1,4 @@
-# COPLAND OS — Launcher (Master-Umgebung Marko)
+# COPLAND OS -- Launcher
 # windows: windows-terminal-profil "COPLAND OS" | macos/linux: wezterm (default_prog) oder pwsh -File
 # workflow: menue -> bereich -> session | ^ = neuer tab | alt+links/rechts = tab-switch
 
@@ -90,6 +90,11 @@ if (-not $env:COPLAND_NO_PANEL) {
 
 # STATE.md aktualisieren (eigener prozess, staleness-guard macht es billig)
 Start-Hidden (Join-Path $CoplandDir 'copland-state.ps1')
+# tagesstart-ernte: 1x pro tag (marker im cache) destilliert claude -p die sessions von
+# gestern ins brain (60_assistent/brain) -- ereignis statt uhrzeit, laptop ist sonst aus
+if (-not (Test-Path (Join-Path $CacheDir ("copland-tagesstart-" + (Get-Date).ToString('yyyy-MM-dd'))))) {
+    Start-Hidden (Join-Path $CoplandDir 'copland-ernte.ps1')
+}
 
 # ziffer = ordner-dekade (1=10, 2=20, ...), [s] = systemraum
 $areas = @(
@@ -98,7 +103,8 @@ $areas = @(
     @{ key='3'; label='VENTURE'; dir='30_venture' },
     @{ key='4'; label='PRIVATE'; dir='40_private' },
     @{ key='5'; label='CAREER '; dir='50_career' },
-    @{ key='s'; label='SYSTEM '; dir='00_System' }
+    @{ key='s'; label='SYSTEM '; dir='00_System' },
+    @{ key='a'; label='ASSIST '; dir='60_assistent'; self=$true }   # self = bereich ist selbst das projekt; puls/stats; [a] startet direkt (eigener zweig)
 )
 
 # bereichs-statistik aus dem gemeinsamen index (EIN scan, gecacht -- copland-shared.ps1)
@@ -134,6 +140,39 @@ function Get-AreaPulse {
     $marks
 }
 
+# letzte session ueber alle bereiche: aus dem gecachten index (kein extra scan).
+# mangled name (c--users-...-onedrive-10-uni-foo) -> echter pfad: unter $OD ebene fuer ebene
+# das kind suchen, dessen mangled name praefix des rests ist.
+function Get-LastSession {
+    $idx = Get-CoplandIndex
+    $best = $null; $bestT = [datetime]::MinValue
+    foreach ($prop in $idx.sessions.PSObject.Properties) {
+        $n = $prop.Name.ToLower()
+        if (-not $n.StartsWith($ODMangled)) { continue }
+        $t = [datetime]$prop.Value.newest
+        if ($t -gt $bestT) { $bestT = $t; $best = $n.Substring($ODMangled.Length) }
+    }
+    if (-not $best) { return $null }
+    $path = $OD; $rest = $best
+    while ($rest) {
+        $hit = $null
+        foreach ($ch in (Get-ChildItem $path -Directory -ErrorAction SilentlyContinue | Sort-Object { $_.Name.Length } -Descending)) {
+            $m = ($ch.Name -replace '[^A-Za-z0-9]', '-').ToLower()
+            if ($rest -eq $m -or $rest.StartsWith($m + '-')) { $hit = $ch; break }
+        }
+        if (-not $hit) { return $null }
+        $path = $hit.FullName
+        $rest = if ($rest.Length -gt $hit.Name.Length) { $rest.Substring($hit.Name.Length + 1) } else { '' }
+    }
+    $areaLbl = ''
+    foreach ($ar in $script:areas) { if ($path -like (Join-Path $OD $ar.dir) + '*') { $areaLbl = $ar.label.Trim() } }
+    $leaf = Split-Path $path -Leaf
+    $title = if ($areaLbl -and $leaf -notmatch '^\d0_') { "$areaLbl / $leaf" } elseif ($areaLbl) { $areaLbl } else { $leaf }
+    $mins = [int]((Get-Date) - $bestT).TotalMinutes
+    $ago = if ($mins -lt 60) { "vor ${mins}m" } elseif ($mins -lt 1440) { "vor $([int]($mins/60))h" } else { "vor $([int]($mins/1440))t" }
+    @{ path = $path; area = $areaLbl; title = $title; ago = $ago }
+}
+
 # einheitliches screen-ende: [z] zurueck (kein 'beliebige taste' mehr)
 function Wait-Back {
     Write-Host ""
@@ -155,36 +194,128 @@ function Show-Menu {
     Write-Host ""
     Write-Host "$DIM  .......................................$R"
     Write-Host ""
-    # zwei spalten: links NUR ziffern (0-6, sortiert), rechts NUR buchstaben (alphabetisch)
-    $menuRows = @(
-        @('0', 'shell  ', $PSExe,       'a', 'ALLTAG ', 'briefing'),
-        @('1', 'UNI    ', '10_uni',     'b', 'backup ', ''),
-        @('2', 'WORK   ', '20_work',    'h', 'hub    ', ''),
-        @('3', 'VENTURE', '30_venture', 'm', 'manual ', ''),
-        @('4', 'PRIVATE', '40_private', 'o', 'lokal  ', ''),
-        @('5', 'CAREER ', '50_career',  'q', 'beenden', ''),
-        @('6', 'WERKST ', 'dokumente',  's', 'SYSTEM ', '00_System'),
-        @('',  '',        '',           'w', 'wired  ', '')
-    )
-    # laufvariable NICHT $r nennen -- ps-variablen sind case-insensitiv, $R ist der ansi-reset
+    # drei spalten: lebensbereiche (ebene 2) | werkzeuge (ebene 1: system, mcp, assistent, werkstatt, hub, vault...) | ambient
     $pulse = Get-AreaPulse
-    foreach ($mrow in $menuRows) {
-        $mk = ''
-        foreach ($ar in $areas) { if ($ar.dir -eq $mrow[2]) { $mk = $pulse[$ar.dir] } }
-        $left = if ($mrow[0]) {
-            "$AC[$($mrow[0])]$R$FG $($mrow[1])$R$DIM  $($mrow[2].PadRight(11))$($mk.PadRight(3))$R"
-        } else { ' ' * 27 }
-        $rightStr = "$AC[$($mrow[3])]$R$FG $($mrow[4])$R"
-        if ($mrow[5]) {
-            $rmk = ''
-            foreach ($ar in $areas) { if ($ar.dir -eq $mrow[5]) { $rmk = " $($pulse[$ar.dir])" } }
-            $rightStr += "$DIM  $($mrow[5])$rmk$R"
+    $bcol = @(
+        @('1', 'UNI',     '10_uni'),
+        @('2', 'WORK',    '20_work'),
+        @('3', 'VENTURE', '30_venture'),
+        @('4', 'PRIVATE', '40_private'),
+        @('5', 'CAREER',  '50_career'),
+        @('6', 'WERKST',  'dokumente')
+    )
+    $wcol = @(
+        @('a', 'ALLTAG',  '60_assistent'),
+        @('h', 'hub',     ''),
+        @('v', 'vault',   '')
+    )
+    $acol = @(
+        @('s', 'SYSTEM',  '00_System'),
+        @('p', 'MCP',     '70_mcp'),
+        @('c', 'chats',   ''),
+        @('b', 'backup',  ''),
+        @('m', 'manual',  '')
+    )
+    $mcol = @(@('u', 'musik'), @('w', 'wired'), @('o', 'lokal'), @('0', 'shell'), @('q', 'beenden'))
+    # zelle: [k] LABEL    ordner        puls   -- feste breite in sichtbaren zeichen (farbcodes zaehlen nicht)
+    $cell = {
+        param($k, $lbl, $d, $mk, $w)
+        $vis = 4 + 9 + 14 + 2
+        $txt = "$AC[$k]$R$FG $($lbl.PadRight(8))$R$DIM $($d.PadRight(14))$R$AC$($mk.PadRight(2))$R"
+        $txt + (' ' * [Math]::Max(0, $w - $vis))
+    }
+    $cw = @(33, 33, 33)
+    Write-Host ($DIM + '   ' + 'lebensbereiche'.PadRight($cw[0]) + 'werkzeuge'.PadRight($cw[1]) + 'admin'.PadRight($cw[2]) + 'ambient' + $R)
+    Write-Host ""
+    $cols = @($bcol, $wcol, $acol)
+    $rows = [Math]::Max([Math]::Max($bcol.Count, $wcol.Count), [Math]::Max($acol.Count, $mcol.Count))
+    for ($mi = 0; $mi -lt $rows; $mi++) {
+        $line = '   '
+        for ($ci = 0; $ci -lt 3; $ci++) {
+            $col = $cols[$ci]
+            if ($mi -lt $col.Count) {
+                $it = $col[$mi]; $mk = ''
+                foreach ($ar in $areas) { if ($ar.dir -eq $it[2]) { $mk = $pulse[$ar.dir] } }
+                $line += & $cell $it[0] $it[1] $it[2] $mk.Trim() $cw[$ci]
+            } else { $line += ' ' * $cw[$ci] }
         }
-        Write-Host "   $left$rightStr"
+        if ($mi -lt $mcol.Count) { $line += "$AC[$($mcol[$mi][0])]$R$FG $($mcol[$mi][1])$R" }
+        Write-Host $line
     }
     Write-Host ""
-    Write-Host "$DIM   ^ = neuer tab    alt+links/rechts = tab-switch$R"
+    $last = Get-LastSession
+    if ($last) {
+        Write-Host "$AC   [enter]$R$FG weiter: $($last.title)$R$DIM   $($last.ago)$R"
+        Write-Host ""
+    }
+    Write-Host "$DIM   ** heute   * gestern   . diese woche        ^ = neuer tab    alt+links/rechts = tab-switch$R"
     Write-Host ""
+}
+
+# werkstatt-browser: ordner zuerst, dann dateien (neueste oben). ziffer = rein/oeffnen, [+] naechste seite,
+# [e] explorer (maus) im aktuellen ordner, [z] eine ebene hoch. ordner mit stundenzettel.ps1 bieten [n] = monat bauen.
+function Show-Folder([string]$dir, [string]$root) {
+    $page = 0
+    while ($true) {
+        Clear-Host
+        $rel = $dir.Substring($root.Length).TrimStart('\', '/')
+        Write-Host ""
+        Write-Host "$AC   WERKSTATT$R$DIM  $(if ($rel) { "\$rel" } else { '(wurzel)' })$R"
+        Write-Host "$DIM   ---------------------------------------$R"
+        $dirs  = @(Get-ChildItem $dir -Directory | Where-Object { $_.Name -notmatch '^\.' } |
+                   Sort-Object @{ e = { $_.Name.StartsWith('_') } }, Name)
+        $files = @(Get-ChildItem $dir -File | Where-Object { $_.Name -notmatch '^(\.|CLAUDE\.md$|_index-neu|INDEX\.html$)' } |
+                   Sort-Object Name -Descending)
+        $items = @($dirs) + @($files)
+        $pages = [Math]::Max(1, [Math]::Ceiling($items.Count / 9))
+        if ($page -ge $pages) { $page = 0 }
+        $shown = @($items | Select-Object -Skip ($page * 9) -First 9)
+        if (-not $shown) { Write-Host "$DIM   (leer)$R" }
+        $i = 1
+        foreach ($it in $shown) {
+            $n = $it.Name; if ($n.Length -gt 34) { $n = $n.Substring(0, 33) + '~' }
+            if ($it.PSIsContainer) {
+                $cnt = @(Get-ChildItem $it.FullName -File -Recurse).Count
+                Write-Host "$AC   [$i]$R$FG $($n.PadRight(34))$R$DIM  ordner  $cnt dateien$R"
+            } else {
+                $tag = $it.Extension.TrimStart('.').ToLower() -replace 'html', 'htm'
+                Write-Host "$AC   [$i]$R$FG $($n.PadRight(34))$R$DIM  $($tag.PadRight(5)) $($it.LastWriteTime.ToString('dd.MM.yy'))$R"
+            }
+            $i++
+        }
+        $gen = Join-Path $dir 'stundenzettel.ps1'
+        Write-Host ""
+        $keys = ''
+        if ($pages -gt 1) { $keys += "[+] seite $($page + 1)/$pages   " }
+        if (Test-Path $gen) { $keys += "[n] monat bauen   " }
+        Write-Host "$DIM   $keys[i] index im browser (maus)   [e] explorer   [z] zurueck$R"
+        Write-Host -NoNewline "$AC   > $R"
+        $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
+        if ("$c" -match '^[zZ]$') { break }
+        if ("$c" -eq '+') { $page++; continue }
+        if ("$c" -match '^[iI]$') { & (Join-Path $root '_index-neu.ps1') | Out-Null; Open-Item (Join-Path $root 'INDEX.html'); continue }
+        if ("$c" -match '^[eE]$') { if ($IsWin) { Start-Process explorer $dir } else { Open-Item $dir }; continue }
+        if ("$c" -match '^[nN]$' -and (Test-Path $gen)) {
+            Write-Host ""
+            Write-Host -NoNewline "$AC   monat (jjjj-mm, enter = aktueller): $R"
+            $mon = (Read-Host).Trim()
+            if (-not $mon) { $mon = (Get-Date).ToString('yyyy-MM') }
+            $txt = Join-Path $dir "monate\$mon.txt"
+            if (-not (Test-Path $txt)) {
+                Warn "eingabe fehlt: monate\$mon.txt -- erst anlegen (zeile: jjjj-mm-tt hh:mm-hh:mm kommentar)"
+                Wait-Back; continue
+            }
+            try { & $gen -Monat $mon -Oeffnen } catch { Warn "$_" }
+            Wait-Back; continue
+        }
+        if ("$c" -match '^[1-9]$') {
+            $idx = [int]"$c" - 1
+            if ($idx -lt $shown.Count) {
+                $it = $shown[$idx]
+                if ($it.PSIsContainer) { Show-Folder $it.FullName $root; $page = 0 } else { Open-Item $it.FullName }
+            }
+        }
+    }
 }
 
 function Start-Claude([string]$dir, [string]$mode, [string]$area) {
@@ -224,6 +355,11 @@ while ($true) {
     Write-Host $k
 
     if ("$k" -match '^[qQ]$') { exit }
+    if ($k -eq [char]13) {
+        $last = Get-LastSession
+        if ($last) { Start-Claude $last.path 'continue' $last.area }
+        continue
+    }
     if ("$k" -match '^[oO]$') {
         Clear-Host
         Write-Host ""
@@ -252,6 +388,21 @@ while ($true) {
         ollama run $lm
         continue
     }
+    if ("$k" -match '^[cC]$') {
+        # chats: alle claude-code-sessions, fortsetzen / loeschen (papierkorb)
+        & (Join-Path $CoplandDir 'copland-chats.ps1')
+        continue
+    }
+    if ("$k" -match '^[vV]$') {
+        # vault: wissens-notizen im terminal (markdown + wikilinks, obsidian-kompatibel)
+        & (Join-Path $CoplandDir 'copland-vault.ps1')
+        continue
+    }
+    if ("$k" -match '^[uU]$') {
+        # musik: spotify-player (media-session, kein api-key). q kehrt zurueck.
+        & (Join-Path $CoplandDir 'copland-spotify.ps1')
+        continue
+    }
     if ("$k" -match '^[bB]$') {
         Clear-Host
         Write-Host ""
@@ -264,7 +415,7 @@ while ($true) {
     }
     if ("$k" -match '^[aA]$') {
         # alltag: eigener ort fuer den personal assistant, startet direkt mit /briefing
-        $adir = Join-Path $OD '40_private/assistent'
+        $adir = Join-Path $OD '60_assistent'
         if (-not (Test-Path $adir)) { New-Item -ItemType Directory -Path $adir -Force | Out-Null }
         if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { Warn 'claude nicht gefunden'; continue }
         Set-Location $adir
@@ -327,7 +478,9 @@ while ($true) {
         $projTotal = 0; $heuteAktiv = 0
         foreach ($ar in $areas) {
             $adir = Join-Path $OD $ar.dir
-            $projs = @(Get-ChildItem $adir -Directory | Where-Object { $_.Name -notmatch '^[_.]' } | Sort-Object Name)
+            # self = bereich ist selbst das projekt (60_assistent)
+            $projs = if ($ar.self) { @(Get-Item $adir) }
+                     else { @(Get-ChildItem $adir -Directory | Where-Object { $_.Name -notmatch '^[_.]' } | Sort-Object Name) }
             $projTotal += $projs.Count
             $L.Add(@{ t = $ar.label.Trim(); c = "$AC$($ar.label.Trim())$R" })
             foreach ($p in $projs) {
@@ -419,40 +572,28 @@ while ($true) {
         Wait-Back
         continue
     }
-    if ("$k" -match '^[67]$') {
-        $wdir = Join-Path $SysDir 'werkstatt'
+    if ("$k" -match '^[pP]$') {
+        # verbindungen: mcp-server, connectoren, cli -- wahrheit in 70_mcp\verbindungen.md
+        $mdir = Join-Path $OD '70_mcp'
+        $mgen = Join-Path $CoplandDir 'copland-mcp.ps1'
         while ($true) {
             Clear-Host
             Write-Host ""
-            Write-Host "$AC   WERKSTATT$R"
+            Write-Host "$AC   VERBINDUNGEN$R$DIM  mcp, connectoren, cli$R"
             Write-Host "$DIM   ---------------------------------------$R"
-            $files = @(Get-ChildItem (Join-Path $wdir 'html/*.html'), (Join-Path $wdir 'pdf/*.pdf') -File) |
-                Sort-Object LastWriteTime -Descending | Select-Object -First 9
-            if ($files) {
-                $i = 1
-                foreach ($f in $files) {
-                    $tag = $f.Extension.TrimStart('.') -replace 'html', 'htm'
-                    $n = $f.BaseName
-                    if ($n.Length -gt 28) { $n = $n.Substring(0, 27) + '~' }
-                    # name auf feste breite -> tag und datum bilden rechte spalten
-                    Write-Host "$AC   [$i]$R$FG $($n.PadRight(28))$R$DIM  $tag  $($f.LastWriteTime.ToString('dd.MM.'))$R"
-                    $i++
-                }
-            } else {
-                Write-Host "$DIM   (leer)$R"
-            }
-            Write-Host ""
-            Write-Host "$DIM   [i] index im browser   [e] explorer   [z] zurueck$R"
+            if (Test-Path $mgen) { & $mgen -Text } else { Write-Host "$WARN   copland-mcp.ps1 fehlt$R" }
+            Write-Host "$DIM   [b] browser   [e] explorer   [v] verbindungen.md   [z] zurueck$R"
             Write-Host -NoNewline "$AC   > $R"
             $c = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
             if ("$c" -match '^[zZ]$') { break }
-            if ("$c" -match '^[iI]$') { Open-Item (Join-Path $wdir 'INDEX.html'); continue }
-            if ("$c" -match '^[eE]$') { if ($IsWin) { Start-Process explorer $wdir } else { Open-Item $wdir }; continue }
-            if ("$c" -match '^[1-9]$') {
-                $idx = [int]"$c" - 1
-                if ($files -and $idx -lt $files.Count) { Open-Item $files[$idx].FullName }
-            }
+            if ("$c" -match '^[bB]$') { & $mgen; Open-Item (Join-Path $mdir 'mcp.html'); continue }
+            if ("$c" -match '^[eE]$') { if ($IsWin) { Start-Process explorer $mdir } else { Open-Item $mdir }; continue }
+            if ("$c" -match '^[vV]$') { Open-Item (Join-Path $mdir 'verbindungen.md'); continue }
         }
+        continue
+    }
+    if ("$k" -match '^[67]$') {
+        Show-Folder (Join-Path $SysDir 'werkstatt') (Join-Path $SysDir 'werkstatt')
         continue
     }
     if ($k -eq '0') {
@@ -475,7 +616,7 @@ while ($true) {
         foreach ($p in $projs) {
             $t = $p.LastWriteTime
             $st = ''
-            $privat = ($sel.dir -eq '40_private' -and $p.Name -ne 'assistent')
+            $privat = ($sel.dir -eq '40_private')
             $cmdMd = Join-Path $p.FullName 'CLAUDE.md'
             if (Test-Path $cmdMd) {
                 $ct = (Get-Item $cmdMd).LastWriteTime

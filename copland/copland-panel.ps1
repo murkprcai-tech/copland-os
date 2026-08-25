@@ -57,6 +57,16 @@ function Wait-PanelKey {
     'tick'
 }
 
+# seiten-ring: 1 limits, 2 grafik
+function Next-PanelPage([string]$act, [int]$cur) {
+    switch ($act) {
+        'left'  { if ($cur -le 1) { 2 } else { 1 } }
+        'right' { if ($cur -ge 2) { 1 } else { 2 } }
+        'g'     { 2 }
+        default { $cur }
+    }
+}
+
 # burn-rate-historie (5h-fenster) im speicher dieses panels
 $hist = New-Object System.Collections.Generic.List[object]
 
@@ -334,9 +344,9 @@ while ($true) {
         }
         if (-not ($sxChart -or $sxModel -or $sxHeat -or $sxRat)) { Write-Host "$DIM  (keine grafik-daten)$R" }
         Write-Host ""
-        Write-Host "$DIM  limits $R$AC< grafik >$R$DIM  [alt+g]$R"
+        Write-Host "$DIM  limits $R$AC< grafik >$R"
         $act = Wait-PanelKey
-        if ($act -ne 'tick') { $page = 1 }
+        $page = Next-PanelPage $act $page
         continue
     }
 
@@ -515,10 +525,13 @@ while ($true) {
     if ($sess.Count -gt 1) {
         Write-Host $SEPLINE
         Write-Host ""
-        foreach ($s in ($sess | Sort-Object area)) {
-            $n = "$($s.name)"
+        $seen = @{}
+        foreach ($s in ($sess | Sort-Object area)) { $sk = "$($s.area)|$($s.name)"; $seen[$sk] = [int]$seen[$sk] + 1 }
+        foreach ($sk in ($seen.Keys | Sort-Object)) {
+            $ap, $n = $sk -split '\|', 2
             if ($n.Length -gt 14) { $n = $n.Substring(0, 13) + '~' }
-            Row 'tab' "$AC$(("$($s.area)").PadRight(9))$R$DIM $n$R"
+            $cnt = if ($seen[$sk] -gt 1) { "$DIM x$($seen[$sk])$R" } else { '' }
+            Row 'tab' "$AC$($ap.PadRight(9))$R$DIM $n$R$cnt"
         }
         Write-Host ""
     }
@@ -599,8 +612,60 @@ while ($true) {
         }
     }
 
-    Write-Host ""
-    Write-Host "$AC  < limits >$R$DIM grafik  [alt+g]$R"
-    $act = Wait-PanelKey
-    if ($act -ne 'tick') { $page = 2 }
+    # --- spotify mini: ganz unten im panel, pegel animiert waehrend der wartezeit ---
+    $spM = Get-SpotifyNow
+    $winH2 = $Host.UI.RawUI.WindowSize.Height
+    $wMax = $Host.UI.RawUI.WindowSize.Width - 12
+    $contentEnd = [Console]::CursorTop
+    $navRow = $winH2 - 2
+    $spRow = -1
+    if ($spM -and "$($spM.title)" -and $contentEnd -lt ($winH2 - 6)) {
+        $spRow = $winH2 - 5
+        $spTag = if ($spM.playing) { "$AC>$R" } else { "$DIM=$R" }
+        $spTxt = "$($spM.artist) -- $($spM.title)"
+        if ($spTxt.Length -gt $wMax) { $spTxt = $spTxt.Substring(0, $wMax - 1) + '~' }
+        try {
+            [Console]::SetCursorPosition(0, $spRow - 1)
+            Write-Host $SEPLINE
+            [Console]::SetCursorPosition(0, $spRow)
+            Write-Host "$DIM  spot   $R$spTag $DIM$spTxt$R" -NoNewline
+        } catch { $spRow = -1 }
+    }
+    try { [Console]::SetCursorPosition(0, $navRow) } catch { }
+    Write-Host "$AC  < limits >$R$DIM grafik$R" -NoNewline
+    # warten wie Wait-PanelKey, dabei den mini-pegel unter der spot-zeile animieren
+    [Console]::CursorVisible = $false
+    $vzW = [math]::Max(10, [math]::Min(20, $wMax))
+    $vh2 = New-Object 'int[]' $vzW
+    $t0 = Get-Date; $act = 'tick'
+    while (((Get-Date) - $t0).TotalSeconds -lt 60) {
+        if ([Console]::KeyAvailable) {
+            $ki = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+            if ("$($ki.Character)" -match '^[qQ]$') { exit }
+            if ("$($ki.Character)" -match '^[gG]$') { $act = 'g'; break }
+            if ($ki.VirtualKeyCode -eq 37) { $act = 'left'; break }
+            if ($ki.VirtualKeyCode -eq 39) { $act = 'right'; break }
+        }
+        if ($spRow -ge 0 -and $spM -and $spM.playing) {
+            for ($vzI = 0; $vzI -lt $vzW; $vzI++) {
+                $vh2[$vzI] = [math]::Max(0, $vh2[$vzI] - (Get-Random -Minimum 1 -Maximum 3))
+                if ((Get-Random -Maximum 100) -lt 25) { $vh2[$vzI] = [math]::Max($vh2[$vzI], (Get-Random -Minimum 1 -Maximum 5)) }
+            }
+            $vz = ''
+            for ($vzI = 0; $vzI -lt $vzW; $vzI++) {
+                $f = $vh2[$vzI]
+                $bits = 0
+                if ($f -ge 1) { $bits = $bits -bor 0xC0 }
+                if ($f -ge 2) { $bits = $bits -bor 0x24 }
+                if ($f -ge 3) { $bits = $bits -bor 0x12 }
+                if ($f -ge 4) { $bits = $bits -bor 0x09 }
+                $vz += [char](0x2800 + $bits)
+            }
+            try { [Console]::SetCursorPosition(9, $spRow + 1); Write-Host "$DIM$vz$R" -NoNewline } catch { }
+            Start-Sleep -Milliseconds 200
+        } else {
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    $page = Next-PanelPage $act $page
 }

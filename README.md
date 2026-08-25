@@ -12,7 +12,20 @@ Built by **Marko Piric**.
 
 ![launcher](docs/screenshot.png)
 
-*The launcher: one key per life area, a few keys for tools. Nothing else on screen.*
+*The launcher: life areas, tools, admin, ambient -- one key each. Nothing else on screen.*
+
+    lebensbereiche                   werkzeuge                        admin                            ambient
+
+    [1] UNI      10_uni        **    [a] ALLTAG   60_assistent  **    [s] SYSTEM   00_System     **    [u] musik
+    [2] WORK     20_work       .     [h] hub                          [p] MCP      70_mcp              [w] wired
+    [3] VENTURE  30_venture          [v] vault                        [c] chats                        [o] lokal
+    [4] PRIVATE  40_private    .                                      [b] backup                       [0] shell
+    [5] CAREER   50_career                                            [m] manual                       [q] beenden
+    [6] WERKST   dokumente
+
+    [enter] weiter: SYSTEM / copland   vor 3m
+
+    ** heute   * gestern   . diese woche        ^ = neuer tab    alt+links/rechts = tab-switch
 
 ## Why
 
@@ -56,22 +69,44 @@ and a single keypress drops you into an AI session exactly where you left off.
 
 ## Features
 
-- **Launcher** -- two-column menu, one key per life area, activity pulse markers,
-  digital rain, project cards with last-activity and status
+- **Launcher** -- four columns: *life areas* | *tools* | *admin* | *ambient*.
+  One key per area, activity pulse (`**` today, `*` yesterday, `.` this week),
+  `[enter]` resumes the last session wherever it was, digital rain, project cards
+  with last-activity and status
 - **Panel** -- a slim live sidebar in every tab: clock, weather, Claude/Codex/free-AI
   usage limits as bars, burn-rate curve (braille), sixel graphics page
-  (token curves, model split, activity heatmap) -- switch pages with arrow keys or `alt+g`
+  (token curves, model split, activity heatmap), open tabs, a Spotify page
+  (media-session control, no API key) -- switch pages with arrow keys or `alt+g`
 
   <img src="docs/panel.png" width="300" alt="panel">
 
 - **STATE.md generator** -- machine-readable snapshot of all projects, aliases,
-  deadlines and cross-project links; the AI reads your whole world in one file
+  deadlines and cross-project links, grouped by level (life areas / tools);
+  the AI reads your whole world in one file
+- **Chats `[c]`** -- every Claude Code session like the chat list in the app,
+  grouped by life area: age, prompt count, size, and whether the day was already
+  distilled into the brain. Resume any of them, or delete to a recycle folder --
+  with an optional *context check* first (Claude reads the chat and saves what
+  is still worth knowing)
+- **Vault `[v]`** -- one Obsidian-compatible knowledge vault per life area, edited
+  in the terminal: one screen (list | note | context), live filter, wikilinks,
+  backlinks, daily notes, ASCII graph, browser force-graph, semantic search and
+  link suggestions via a local embedding model (Ollama). Cross-vault links resolve
+- **Hooks** (node, no npm) -- a *guard* that blocks writes to taboo paths (cloud
+  mounts, password files, secrets, deletes in protected areas) while reading stays
+  free; an *audit log* of every write action; *toast + sound* when Claude needs
+  you; *vault recall* that silently adds the three most relevant notes to each prompt
+- **Daily harvest** -- once a day the launcher distils yesterday's sessions into a
+  small cross-project *brain* (people, decisions, preferences, open threads,
+  deadlines) so nothing depends on old chats staying around
 - **Hub** -- terminal dashboard + self-contained HTML command center
-  (gauges, donut, heatmap, force-directed life graph, commit timeline)
+  (gauges, donut, heatmap, force-directed life graph, commit timeline);
+  **Connections `[p]`** -- what MCP servers, connectors and CLIs are wired, where a login is missing
 - **The Council (`/rat`)** -- ask Claude, GPT, NVIDIA Nemotron, Meta Llama and
   Alibaba Qwen the same question in parallel, get a synthesis plus a
   "where they disagree" block; the extra voices run on free API tiers (0 EUR)
-- **Ambient mode** -- fullscreen clock + limits + rain when you are not working
+- **Ambient mode** -- fullscreen clock + limits + rain when you are not working;
+  **Spotify `[u]`** -- fullscreen player with braille visualizer
 
 ## How it fits together
 
@@ -85,7 +120,8 @@ to know where you are. No database, no daemon, no framework.
 
 Everything that makes the environment feel like one thing, not five tools:
 
-- the **launcher + panel** (terminal), **STATE.md** generator, **hub**
+- the **launcher + panel** (terminal), **STATE.md** generator, **hub**, **chats**,
+  **vault**, the **daily harvest** and the **hooks** (guard, audit, notify, vault recall)
 - the **answer style** -- `claude/output-styles/concise.md` + `templates/GLOBAL-CLAUDE.md`:
   short, essence first, no filler. `/setup` offers to install it
 - the **constitution** and project templates (`templates/`) -- the rules that keep
@@ -97,7 +133,7 @@ Everything that makes the environment feel like one thing, not five tools:
 
 ## Skills (built in)
 
-Four Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skills/`:
+Five Claude Code skills ship in `claude/skills/` -- the installer copies them to `~/.claude/skills/`:
 
 | skill | what it does |
 |---|---|
@@ -105,6 +141,7 @@ Four Claude Code skills ship in `claude/skills/` -- copy them to `~/.claude/skil
 | `/briefing` | calendar, mails that need action, deadlines, open items, last work -- one screen |
 | `/dual` | same task to Claude and Codex (GPT) in parallel, one synthesised answer |
 | `/council` | same question to Claude, GPT, Nemotron, Llama, Qwen -- synthesis + where they disagree (free tiers) |
+| `/notiz` | write or extend a knowledge note in the vault of the current life area (wikilinks, backlinks) |
 
 ## Requirements + install
 
@@ -118,16 +155,18 @@ One installer, every platform -- the scripts detect the system at runtime:
 
 - [Claude Code](https://claude.com/claude-code) (and optionally the Codex CLI)
 - Font: [Departure Mono](https://departuremono.com/) (or any mono font you like)
+- [Node.js](https://nodejs.org) for the hooks (guard, audit, notify, vault recall) -- plain node, no npm packages
 - Optional: `ccusage` (npm) for token charts, [Sixel](https://www.powershellgallery.com/packages/Sixel)
-  PowerShell module (Windows Terminal >= 1.22), Ollama for offline models
+  PowerShell module (Windows Terminal >= 1.22), Ollama for offline models and the vault's semantic search
 
 Root folder defaults to `~/OneDrive` (if it exists) or `~/copland`; `-Root <folder>`
 or `COPLAND_ROOT` for anything else. Details and the manual route: [SETUP.md](SETUP.md).
 
 ## Repository layout
 
-    copland/   launcher, panel, state/hub generators, council helper, manual
-    claude/    statusline scripts, color theme, output-styles/concise.md, skills/ (setup, briefing, dual, council)
+    copland/   launcher, panel, state/hub/mcp generators, chats, vault (+ browser graph template),
+               daily harvest, spotify, council helper, manual; hooks/ (guard, audit, notify, vault-recall, toast)
+    claude/    statusline scripts, color theme, output-styles/concise.md, skills/ (setup, briefing, dual, council, notiz)
     templates/ ROOT-CLAUDE.md (constitution), PROJECT-CLAUDE.md (project context), GLOBAL-CLAUDE.md (answer style)
     setup/     install.ps1 (all platforms), macos.sh (brew bootstrap), wezterm.lua
     docs/      screenshots (launcher, panel), animated banner, architecture diagram (svg)
