@@ -18,8 +18,8 @@ $Papierkorb = Join-Path $CacheDir 'copland-chat-papierkorb'
 $PageSize = 18
 
 # bereichs-label aus dem echten projektpfad (10_uni -> UNI ...)
-$AreaNames = @{ '10_uni'='UNI'; '20_work'='WORK'; '30_venture'='VENTURE'; '40_private'='PRIVATE'; '50_career'='CAREER';
-                '60_assistent'='ALLTAG'; '00_System'='SYSTEM'; '70_mcp'='MCP' }
+$AreaNames = @{ '10_uni'='uni'; '20_work'='work'; '30_venture'='venture'; '40_private'='private'; '50_career'='career';
+                '60_assistent'='alltag'; '80_general'='general'; '00_System'='system'; '70_mcp'='mcp' }
 function Get-ProjLabel([string]$p) {
     if (-not $p) { return '?' }
     $rel = $p
@@ -73,7 +73,7 @@ function Get-ErnteTage {
 }
 
 # reihenfolge der bereiche in der liste (verfassung: lebensbereiche, dann werkzeuge)
-$AreaOrder = @('UNI','WORK','VENTURE','PRIVATE','CAREER','ALLTAG','SYSTEM','MCP')
+$AreaOrder = @('uni','work','venture','private','career','alltag','general','system','mcp')
 function Get-AreaKey([string]$label) {
     $a = ($label -split ' / ')[0]
     $i = [array]::IndexOf($AreaOrder, $a)
@@ -164,14 +164,14 @@ function Invoke-KontextCheck($c) {
     (Get-Transcript $c.file) | Set-Content $inp -Encoding utf8
     $brain = Join-Path $OD '60_assistent/brain'
     $prompt = @"
-Kontext-Check vor dem Loeschen eines Chats ($($c.label), $($c.last.ToString('yyyy-MM-dd'))). Du bist der Personal Assistant des Nutzers (60_assistent).
+Kontext-Check vor dem Loeschen eines Chats ($($c.label), $($c.last.ToString('yyyy-MM-dd'))). Du bist Markos Personal Assistant (60_assistent).
 Lies $inp (gekuerztes Transkript). Pruefe, ob darin projektuebergreifendes Querwissen steckt, das NOCH NICHT im Brain steht
 (Dateien in ${brain}: personen.md, entscheidungen.md, vorlieben.md, laufend.md; Fristen: $(Join-Path $OD '60_assistent/erinnerungen.md')).
 Vorher lesen, deduplizieren, nur Fehlendes eintragen (eine datierte Zeile je Fakt, Format im Kopf jeder Datei). Nichts erfinden,
 nichts Projektinternes, keine anderen Dateien anfassen. Antworte mit maximal 4 Zeilen: was eingetragen wurde -- oder 'nichts neues'.
 "@
     Write-Host "$DIM   kontext-check laeuft (claude -p) ...$R"
-    $out = & claude -p $prompt --permission-mode bypassPermissions --add-dir $OD --add-dir $CacheDir 2>&1
+    $out = & claude -p $prompt --model sonnet --permission-mode bypassPermissions --add-dir $OD --add-dir $CacheDir 2>&1
     Write-Host ""
     foreach ($l in ("$out" -split "`n")) { if ($l.Trim()) { Write-Host "$FG   $($l.Trim())$R" } }
     Write-Host ""

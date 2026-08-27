@@ -13,13 +13,14 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 # ein vault je lebensbereich: <bereich>/vault (obsidian kann jeden ordner separat oeffnen)
 $Vaults = @(
-    @{ key = '1'; id = 'uni';     label = 'UNI';     dir = '10_uni' },
-    @{ key = '2'; id = 'work';    label = 'WORK';    dir = '20_work' },
-    @{ key = '3'; id = 'venture'; label = 'VENTURE'; dir = '30_venture' },
-    @{ key = '4'; id = 'privat';  label = 'PRIVATE'; dir = '40_private' },
-    @{ key = '5'; id = 'career';  label = 'CAREER';  dir = '50_career' },
-    @{ key = 'a'; id = 'alltag';  label = 'ALLTAG';  dir = '60_assistent' },
-    @{ key = 's'; id = 'system';  label = 'SYSTEM';  dir = '00_System' }
+    @{ key = '1'; id = 'uni';     label = 'uni';     dir = '10_uni' },
+    @{ key = '2'; id = 'work';    label = 'work';    dir = '20_work' },
+    @{ key = '3'; id = 'venture'; label = 'venture'; dir = '30_venture' },
+    @{ key = '4'; id = 'privat';  label = 'private'; dir = '40_private' },
+    @{ key = '5'; id = 'career';  label = 'career';  dir = '50_career' },
+    @{ key = 'a'; id = 'alltag';  label = 'alltag';  dir = '60_assistent' },
+    @{ key = 'g'; id = 'general'; label = 'general'; dir = '80_general' },
+    @{ key = 's'; id = 'system';  label = 'system';  dir = '00_System' }
 )
 $script:Cur = $null
 $VaultDir = ''

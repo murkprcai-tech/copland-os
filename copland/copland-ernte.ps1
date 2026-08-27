@@ -2,7 +2,7 @@
 # destilliert die sessions von GESTERN ins brain (60_assistent/brain), ergaenzt erinnerungen,
 # baut STATE neu. ereignisgesteuert: der launcher startet das 1x pro tag versteckt
 # (marker %LOCALAPPDATA%\copland-tagesstart-yyyy-MM-dd), weil der laptop nur an ist,
-# wenn der nutzer arbeitet. manuell: -Force (ignoriert marker), -Tag yyyy-MM-dd (anderer tag).
+# wenn marko arbeitet. manuell: -Force (ignoriert marker), -Tag yyyy-MM-dd (anderer tag).
 # log: %LOCALAPPDATA%\copland-ernte.log
 param([switch]$Force, [string]$Tag = '')
 
@@ -28,10 +28,14 @@ $maxChars = 20000
 $files = Get-ChildItem (Join-Path $ClaudeHome 'projects') -Recurse -File -Filter *.jsonl |
     Where-Object { $_.LastWriteTime.Date -eq $day.Date -or ($_.CreationTime.Date -eq $day.Date) } |
     Sort-Object LastWriteTime
-if (-not $files) { Log "keine sessions am $($day.ToString('yyyy-MM-dd')) -- nur state"; Start-Hidden (Join-Path $CoplandDir 'copland-state.ps1'); exit }
-$perFile = [math]::Max(1500, [int]($maxChars / $files.Count))
+# inbox aus dem general chat (80_general/inbox.md): unsortierte zeilen zaehlen
+$inbox = Join-Path $OD '80_general/inbox.md'
+$inboxN = 0
+if (Test-Path $inbox) { $inboxN = @(Get-Content $inbox -Encoding utf8 | Where-Object { $_ -match '^\s*- \d{4}-\d{2}-\d{2}' -and $_ -notmatch '\|\s*\?\w+\s*$' }).Count }
+if (-not $files -and $inboxN -eq 0) { Log "keine sessions am $($day.ToString('yyyy-MM-dd')), inbox leer -- nur state"; Start-Hidden (Join-Path $CoplandDir 'copland-state.ps1'); exit }
+$perFile = [math]::Max(1500, [int]($maxChars / [math]::Max(1, $files.Count)))
 foreach ($f in $files) {
-    $proj = ($f.Directory.Name -replace ('^' + [regex]::Escape($ODMangled)), '') -replace '^c--users-[a-z0-9]+-', '~/'
+    $proj = ($f.Directory.Name -replace ('^' + [regex]::Escape($ODMangled)), '') -replace '^c--users-marep-', '~/'
     [void]$sb.AppendLine("### session: $proj ($($f.LastWriteTime.ToString('HH:mm')))")
     $acc = 0
     foreach ($ln in (Get-Content $f.FullName -Encoding utf8)) {
@@ -54,15 +58,31 @@ foreach ($f in $files) {
 }
 $inp = Join-Path $CacheDir 'copland-ernte-input.txt'
 $sb.ToString() | Set-Content $inp -Encoding utf8
-Log "ernte $($day.ToString('yyyy-MM-dd')): $($files.Count) sessions, $($sb.Length) zeichen -> claude -p"
+Log "ernte $($day.ToString('yyyy-MM-dd')): $($files.Count) sessions, $($sb.Length) zeichen, inbox $inboxN -> claude -p"
+
+$inboxBlock = ''
+if ($inboxN -gt 0) {
+    $inboxBlock = @"
+
+INBOX (zuerst, $inboxN unsortierte Zeilen): Lies $inbox (roher Eingang aus dem General Chat, Format '- datum zeit | text').
+Ordne JEDE Zeile einem Ziel zu und trage sie dort ein (Format des Ziels beachten, deduplizieren):
+person -> $brain/personen.md; offener Faden/Todo -> $brain/laufend.md bzw. $(Join-Path $SysDir 'offene-punkte.md');
+Frist mit Datum -> $(Join-Path $OD '60_assistent/erinnerungen.md'); Entscheidung -> $brain/entscheidungen.md;
+Wissen/Idee mit Substanz -> Notiz im Vault des Bereichs (<bereich>/vault, wie unten); Projektstand -> Abschnitt '## Stand' der Projekt-CLAUDE.md.
+Danach die Zeile aus $inbox entfernen und nach $(Join-Path $OD '80_general/inbox-verarbeitet.md') anhaengen als
+'- datum zeit | text -> ziel ($($day.AddDays(1).ToString('yyyy-MM-dd')))'. Unklar oder privat (40_private): Zeile bleibt in $inbox,
+am Ende ' | ?bereich' anhaengen (z.B. ' | ?privat', ' | ?uni') -- Marko entscheidet. Nichts erfinden, nichts loeschen.
+"@
+}
 
 $prompt = @"
-Tagesstart-Ernte fuer $($day.ToString('yyyy-MM-dd')). Du arbeitest im Bereich 60_assistent (Personal Assistant des Nutzers).
-Lies $inp (gekuerzte Transkripte aller Sessions von gestern, nur user/assistant-Text).
+Tagesstart-Ernte fuer $($day.ToString('yyyy-MM-dd')). Du arbeitest im Bereich 60_assistent (Personal Assistant von Marko).
+$inboxBlock
+SESSIONS: Lies $inp (gekuerzte Transkripte aller Sessions von gestern, nur user/assistant-Text; kann leer sein).
 Destilliere daraus NUR projektuebergreifendes Querwissen und trage es ins Brain ein (Dateien in $brain,
 Format steht im Kopf jeder Datei, eine datierte Zeile pro Fakt, vorher lesen und deduplizieren):
 - personen.md: neue/veraenderte Personen (name | rolle | kontext | zuletzt)
-- entscheidungen.md: Entscheidungen des Nutzers (auch verworfene Wege mit Grund), append
+- entscheidungen.md: Entscheidungen Markos (auch verworfene Wege mit Grund), append
 - vorlieben.md: Vorlieben/Korrekturen zum Arbeitsstil (alte Zeile ersetzen)
 - laufend.md: offene Faeden quer durch Bereiche (append; erledigte Zeilen loeschen; max ~15 Zeilen)
 Fristen/Termine mit Datum zusaetzlich nach $(Join-Path $OD '60_assistent/erinnerungen.md') (Format dort ansehen).
@@ -72,8 +92,8 @@ sonst 60_assistent; NIE 40_private). Stil der dortigen Notizen (dateiname klein-
 verwandte Notizen setzen, bestehende Notizen lieber ergaenzen als neue anlegen).
 Nichts erfinden, nichts Projektinternes (das steht in den Projekt-CLAUDE.mds). Keine anderen Dateien anfassen.
 Danach ausfuehren: powershell -NoProfile -ExecutionPolicy Bypass -File "$(Join-Path $CoplandDir 'copland-state.ps1')"
-Antworte am Ende mit maximal 5 Zeilen: was eingetragen wurde.
+Antworte am Ende mit maximal 5 Zeilen: was eingetragen wurde (inbox: n sortiert, m offen).
 "@
 Set-Location (Join-Path $OD '60_assistent')
-$out = & claude -p $prompt --permission-mode bypassPermissions --add-dir $SysDir --add-dir $CacheDir 2>&1
+$out = & claude -p $prompt --model sonnet --permission-mode bypassPermissions --add-dir $SysDir --add-dir $CacheDir --add-dir (Join-Path $OD '80_general') 2>&1
 Log ("ergebnis: " + (($out | Out-String) -replace '\s+', ' ').Trim())

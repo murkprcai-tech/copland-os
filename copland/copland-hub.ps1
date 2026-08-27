@@ -11,7 +11,7 @@ $out = Join-Path $CoplandDir 'hub.html'
 $areas = @(
     @{ name = 'uni'; dir = '10_uni' }, @{ name = 'work'; dir = '20_work' },
     @{ name = 'venture'; dir = '30_venture' }, @{ name = 'private'; dir = '40_private' },
-    @{ name = 'career'; dir = '50_career' }, @{ name = 'assistent'; dir = '60_assistent'; self = $true }, @{ name = 'system'; dir = '00_System' }
+    @{ name = 'career'; dir = '50_career' }, @{ name = 'assistent'; dir = '60_assistent'; self = $true }, @{ name = 'general'; dir = '80_general'; self = $true }, @{ name = 'system'; dir = '00_System' }
 )
 
 # --- limits aus den panel-caches ---

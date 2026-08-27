@@ -41,6 +41,8 @@ Show ONE table. Default area scheme (user renames freely):
 | `30_venture` | own projects that should earn money | |
 | `40_private` | private -- highest confidentiality | |
 | `50_career` | applications, CVs, certificates | |
+| `60_assistent` | personal assistant: brain (cross-project memory), reminders, mails/calendar -- launcher `[a]` | |
+| `80_general` | general chat: dump thoughts, `inbox.md` is sorted nightly -- launcher `[g]` (`templates/GENERAL-CLAUDE.md` + empty `inbox.md`) | |
 | `90_archive` | finished, read-only | |
 
 Only propose areas that have content. Then the mapping:

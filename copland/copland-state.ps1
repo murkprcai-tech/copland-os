@@ -14,7 +14,7 @@ $out = Join-Path $SysDir 'STATE.md'
 if (Test-Path $out) {
     $stateT = (Get-Item $out).LastWriteTime
     if (((Get-Date) - $stateT).TotalHours -lt 6) {
-        $newer = @(Get-ChildItem (Join-Path $OD '10_uni'), (Join-Path $OD '20_work'), (Join-Path $OD '30_venture'), (Join-Path $OD '50_career'), (Join-Path $OD '60_assistent'), $SysDir `
+        $newer = @(Get-ChildItem (Join-Path $OD '10_uni'), (Join-Path $OD '20_work'), (Join-Path $OD '30_venture'), (Join-Path $OD '50_career'), (Join-Path $OD '60_assistent'), (Join-Path $OD '80_general'), $SysDir `
                 -Recurse -Depth 2 -Filter 'CLAUDE.md' | Where-Object { $_.LastWriteTime -gt $stateT })
         $op2 = Get-Item (Join-Path $SysDir 'offene-punkte.md')
         if (-not $newer -and $op2.LastWriteTime -le $stateT) { exit }
@@ -23,7 +23,7 @@ if (Test-Path $out) {
 
 $areas = @(
     @{ dir = '10_uni' }, @{ dir = '20_work' }, @{ dir = '30_venture' },
-    @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '60_assistent'; self = $true }, @{ dir = '00_System' }
+    @{ dir = '40_private' }, @{ dir = '50_career' }, @{ dir = '60_assistent'; self = $true }, @{ dir = '80_general'; self = $true }, @{ dir = '00_System' }
 )
 
 # session-aktivitaet aus dem gemeinsamen index

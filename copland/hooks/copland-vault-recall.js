@@ -17,7 +17,7 @@ try {
   const od = process.env.COPLAND_ROOT || path.join(home, 'OneDrive');
   const cwd = L.norm(h.cwd || process.cwd());
   const MAP = [['10_uni', 'uni'], ['20_work', 'work'], ['30_venture', 'venture'], ['40_private', 'privat'],
-               ['50_career', 'career'], ['60_assistent', 'alltag'], ['00_system', 'system'], ['70_mcp', 'system']];
+               ['50_career', 'career'], ['60_assistent', 'alltag'], ['80_general', 'general'], ['00_system', 'system'], ['70_mcp', 'system']];
   let id = null, dir = null;
   for (const [d, i] of MAP) { if (cwd.includes('/' + d)) { id = i; dir = d; break; } }
   if (!id || id === 'privat') process.exit(0);          // privat: nie automatisch

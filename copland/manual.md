@@ -28,6 +28,8 @@ LAUNCHER -- HINGEHEN
            puls hinter dem bereich: ** heute, * gestern, . woche
   [s]      systemraum 00_System (gespraeche ueber die umgebung)
   [a]      alltag: bereich 60_assistent (allzweck-ort, brain), startet mit /briefing
+  [g]      general: bereich 80_general (denkraum/dump) -- alles landet in inbox.md,
+           die tagesstart-ernte sortiert nachts in brain/vaults/offene punkte
   [6]      werkstatt: ordner-browser -- ziffer = ordner rein / datei oeffnen, [z] hoch, [i] index (maus)
            [i] browser-uebersicht   [e] explorer   [z] zurueck
   [0]      shell ohne claude
@@ -48,7 +50,8 @@ LAUNCHER -- NACHSEHEN
 LAUNCHER -- REST
   [c] chats: alle sessions, [nr] fortsetzen, [d nr] papierkorb, [s text] filter
   [b] config-backup     [m] dieses manual      [q] beenden
-  [enter]               letzte session fortsetzen (claude --continue im letzten projekt)
+  [enter]               ausgewaehlten chat fortsetzen (letzte 4 chats im menue, pfeil hoch/runter
+                        waehlt, claude --resume <id> im projektordner; ernte-sessions ausgeblendet)
   puls-spalte: ** heute, * gestern, . diese woche
 
 VAULT [v] (wissens-notizen im terminal, obsidian-kompatibel)
@@ -178,7 +181,7 @@ ASSISTENT + BRAIN (60_assistent)
   versteckt claude -p, das die sessions von gestern ins brain
   destilliert, erinnerungen ergaenzt und STATE neu baut
   (copland-ernte.ps1, log: %LOCALAPPDATA%\copland-ernte.log).
-  laptop ist nur an, wenn der nutzer arbeitet -> ereignis statt uhrzeit.
+  laptop ist nur an, wenn marko arbeitet -> ereignis statt uhrzeit.
 
 STATE
   00_System\STATE.md = maschinenzustand fuer claude (projekte, zurufe,

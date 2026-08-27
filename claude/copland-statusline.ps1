@@ -96,4 +96,16 @@ if ($j.session_id) {
 Get-ChildItem $sdir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-10) } | Remove-Item -Force
 
 # --- Ausgabe (eine zeile) ---
-Write-Output "${DIM}[wired]${R} ${AC}${area}${R}${SEP}${FG}${name}${R}"
+# vault-recall: welche notizen der hook gerade mitgegeben hat (marker < 3 min)
+$vr = ''
+$vrF = Join-Path $env:LOCALAPPDATA 'copland-vault-recall.json'
+if (Test-Path $vrF) {
+    try {
+        $vj = Get-Content $vrF -Raw | ConvertFrom-Json
+        if ($vj.notes -and (([DateTimeOffset]::Now.ToUnixTimeMilliseconds() - [double]$vj.ts) -lt 180000)) {
+            $vn = @($vj.notes | ForEach-Object { if ("$_".Length -gt 22) { "$_".Substring(0, 21) + '~' } else { "$_" } })
+            $vr = "${SEP}${DIM}vault: $($vn -join ', ')${R}"
+        }
+    } catch { }
+}
+Write-Output "${DIM}[wired]${R} ${AC}${area}${R}${SEP}${FG}${name}${R}${vr}"

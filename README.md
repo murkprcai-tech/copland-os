@@ -16,16 +16,19 @@ Built by **Marko Piric**.
 
     lebensbereiche                   werkzeuge                        admin                            ambient
 
-    [1] UNI      10_uni        **    [a] ALLTAG   60_assistent  **    [s] SYSTEM   00_System     **    [u] musik
-    [2] WORK     20_work       .     [h] hub                          [p] MCP      70_mcp              [w] wired
-    [3] VENTURE  30_venture          [v] vault                        [c] chats                        [o] lokal
-    [4] PRIVATE  40_private    .                                      [b] backup                       [0] shell
-    [5] CAREER   50_career                                            [m] manual                       [q] beenden
-    [6] WERKST   dokumente
+    [1] uni      10_uni        **    [a] alltag   60_assistent  **    [s] system   00_System     **    [u] musik
+    [2] work     20_work       .     [g] general  80_general    *     [p] mcp      70_mcp              [w] wired
+    [3] venture  30_venture          [h] hub                          [c] chats                        [o] lokal
+    [4] private  40_private    .     [v] vault                        [b] backup                       [0] shell
+    [5] career   50_career                                            [m] manual                       [q] beenden
+    [6] werkst   dokumente
 
-    [enter] weiter: SYSTEM / copland   vor 3m
+    [enter] > system / copland        vor 3m
+              uni / vorkurs           vor 1h
+              general                 vor 2h
+              work / rechnungen       gestern
 
-    ** heute   * gestern   . diese woche        ^ = neuer tab    alt+links/rechts = tab-switch
+    ** heute   * gestern   . diese woche   pfeil hoch/runter = letzter chat   ^ = neuer tab   alt+links/rechts = tab
 
 ## Why
 
@@ -71,8 +74,13 @@ and a single keypress drops you into an AI session exactly where you left off.
 
 - **Launcher** -- four columns: *life areas* | *tools* | *admin* | *ambient*.
   One key per area, activity pulse (`**` today, `*` yesterday, `.` this week),
-  `[enter]` resumes the last session wherever it was, digital rain, project cards
-  with last-activity and status
+  the last four chats listed under the menu -- arrow up/down picks one, `[enter]`
+  resumes it inside its project folder -- digital rain, project cards with
+  last-activity and status
+- **General chat `[g]`** -- a thinking room. Dump thoughts, ideas, half sentences;
+  every one lands as a line in `80_general/inbox.md`. The nightly harvest sorts
+  them into the brain, the area vaults, open items or deadlines and keeps a log
+  (`inbox-verarbeitet.md`); anything unclear stays in the inbox marked `?area`
 - **Panel** -- a slim live sidebar in every tab: clock, weather, Claude/Codex/free-AI
   usage limits as bars, burn-rate curve (braille), sixel graphics page
   (token curves, model split, activity heatmap), open tabs, a Spotify page
@@ -98,7 +106,8 @@ and a single keypress drops you into an AI session exactly where you left off.
   you; *vault recall* that silently adds the three most relevant notes to each prompt
 - **Daily harvest** -- once a day the launcher distils yesterday's sessions into a
   small cross-project *brain* (people, decisions, preferences, open threads,
-  deadlines) so nothing depends on old chats staying around
+  deadlines) so nothing depends on old chats staying around; the same run sorts
+  the general-chat inbox
 - **Hub** -- terminal dashboard + self-contained HTML command center
   (gauges, donut, heatmap, force-directed life graph, commit timeline);
   **Connections `[p]`** -- what MCP servers, connectors and CLIs are wired, where a login is missing

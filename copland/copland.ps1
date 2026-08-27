@@ -1,4 +1,4 @@
-# COPLAND OS -- Launcher
+# COPLAND OS — Launcher (Master-Umgebung Marko)
 # windows: windows-terminal-profil "COPLAND OS" | macos/linux: wezterm (default_prog) oder pwsh -File
 # workflow: menue -> bereich -> session | ^ = neuer tab | alt+links/rechts = tab-switch
 
@@ -98,13 +98,14 @@ if (-not (Test-Path (Join-Path $CacheDir ("copland-tagesstart-" + (Get-Date).ToS
 
 # ziffer = ordner-dekade (1=10, 2=20, ...), [s] = systemraum
 $areas = @(
-    @{ key='1'; label='UNI    '; dir='10_uni' },
-    @{ key='2'; label='WORK   '; dir='20_work' },
-    @{ key='3'; label='VENTURE'; dir='30_venture' },
-    @{ key='4'; label='PRIVATE'; dir='40_private' },
-    @{ key='5'; label='CAREER '; dir='50_career' },
-    @{ key='s'; label='SYSTEM '; dir='00_System' },
-    @{ key='a'; label='ASSIST '; dir='60_assistent'; self=$true }   # self = bereich ist selbst das projekt; puls/stats; [a] startet direkt (eigener zweig)
+    @{ key='1'; label='uni    '; dir='10_uni' },
+    @{ key='2'; label='work   '; dir='20_work' },
+    @{ key='3'; label='venture'; dir='30_venture' },
+    @{ key='4'; label='private'; dir='40_private' },
+    @{ key='5'; label='career '; dir='50_career' },
+    @{ key='s'; label='system '; dir='00_System' },
+    @{ key='a'; label='assist '; dir='60_assistent'; self=$true },  # self = bereich ist selbst das projekt; puls/stats; [a] startet direkt (eigener zweig)
+    @{ key='g'; label='general'; dir='80_general'; self=$true }    # general chat: dump-ort, inbox.md, [g] startet direkt
 )
 
 # bereichs-statistik aus dem gemeinsamen index (EIN scan, gecacht -- copland-shared.ps1)
@@ -173,6 +174,44 @@ function Get-LastSession {
     @{ path = $path; area = $areaLbl; title = $title; ago = $ago }
 }
 
+# letzte n sessions aus ~\.claude\history.jsonl (klein, ein read): id, projekt, titel, alter.
+# ernte-/kontext-check-sessions (claude -p) bleiben draussen. auswahl im menue per pfeil hoch/runter + [enter].
+$script:Sel = 0
+$script:Recent = @()
+function Get-RecentSessions([int]$n = 4) {
+    $hf = Join-Path $ClaudeHome 'history.jsonl'
+    if (-not (Test-Path $hf)) { return @() }
+    $h = @{}
+    foreach ($ln in [IO.File]::ReadLines($hf)) {
+        if (-not $ln) { continue }
+        $o = $null; try { $o = $ln | ConvertFrom-Json } catch { continue }
+        if (-not $o.sessionId -or -not $o.project) { continue }
+        $id = "$($o.sessionId)"
+        if (-not $h[$id]) { $h[$id] = @{ id = $id; title = "$($o.display)"; last = 0; project = "$($o.project)" } }
+        if ($o.timestamp -gt $h[$id].last) { $h[$id].last = $o.timestamp }
+        if (-not $h[$id].title -and $o.display) { $h[$id].title = "$($o.display)" }
+    }
+    $out = @()
+    foreach ($sx in ($h.Values | Sort-Object { [long]$_.last } -Descending)) {
+        if ($sx.title -match '^(Tagesstart-Ernte|Kontext-Check|<)') { continue }
+        if (-not (Test-Path $sx.project)) { continue }
+        $areaLbl = ''
+        foreach ($ar in $script:areas) { if ($sx.project -like (Join-Path $OD $ar.dir) + '*') { $areaLbl = $ar.label.Trim() } }
+        $leaf = Split-Path $sx.project -Leaf
+        $where = if ($areaLbl -and $leaf -notmatch '^\d0_') { "$areaLbl / $leaf" } elseif ($areaLbl) { $areaLbl } else { $leaf.ToLower() }
+        if ($where.Length -gt 22) { $where = $where.Substring(0, 21) + '~' }
+        $t = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$sx.last).LocalDateTime
+        $mins = [int]((Get-Date) - $t).TotalMinutes
+        $ago = if ($mins -lt 60) { "vor ${mins}m" } elseif ($mins -lt 1440) { "vor $([int]($mins/60))h" } else { "vor $([int]($mins/1440))t" }
+        $title = ($sx.title -replace '\s+', ' ').Trim()
+        if (-not $title) { $title = '(ohne prompt)' }
+        if ($title.Length -gt 40) { $title = $title.Substring(0, 39) + '~' }
+        $out += @{ id = $sx.id; path = $sx.project; area = $areaLbl; where = $where; title = $title; ago = $ago }
+        if ($out.Count -ge $n) { break }
+    }
+    $out
+}
+
 # einheitliches screen-ende: [z] zurueck (kein 'beliebige taste' mehr)
 function Wait-Back {
     Write-Host ""
@@ -197,21 +236,22 @@ function Show-Menu {
     # drei spalten: lebensbereiche (ebene 2) | werkzeuge (ebene 1: system, mcp, assistent, werkstatt, hub, vault...) | ambient
     $pulse = Get-AreaPulse
     $bcol = @(
-        @('1', 'UNI',     '10_uni'),
-        @('2', 'WORK',    '20_work'),
-        @('3', 'VENTURE', '30_venture'),
-        @('4', 'PRIVATE', '40_private'),
-        @('5', 'CAREER',  '50_career'),
-        @('6', 'WERKST',  'dokumente')
+        @('1', 'uni',     '10_uni'),
+        @('2', 'work',    '20_work'),
+        @('3', 'venture', '30_venture'),
+        @('4', 'private', '40_private'),
+        @('5', 'career',  '50_career'),
+        @('6', 'werkst',  'dokumente')
     )
     $wcol = @(
-        @('a', 'ALLTAG',  '60_assistent'),
+        @('a', 'alltag',  '60_assistent'),
+        @('g', 'general', '80_general'),
         @('h', 'hub',     ''),
         @('v', 'vault',   '')
     )
     $acol = @(
-        @('s', 'SYSTEM',  '00_System'),
-        @('p', 'MCP',     '70_mcp'),
+        @('s', 'system',  '00_System'),
+        @('p', 'mcp',     '70_mcp'),
         @('c', 'chats',   ''),
         @('b', 'backup',  ''),
         @('m', 'manual',  '')
@@ -243,12 +283,20 @@ function Show-Menu {
         Write-Host $line
     }
     Write-Host ""
-    $last = Get-LastSession
-    if ($last) {
-        Write-Host "$AC   [enter]$R$FG weiter: $($last.title)$R$DIM   $($last.ago)$R"
+    $script:Recent = @(Get-RecentSessions 4)
+    if ($script:Recent.Count) {
+        if ($script:Sel -ge $script:Recent.Count) { $script:Sel = 0 }
+        for ($ri = 0; $ri -lt $script:Recent.Count; $ri++) {
+            $rs = $script:Recent[$ri]
+            if ($ri -eq $script:Sel) {
+                Write-Host "$AC   [enter]$R$FG > $($rs.where.PadRight(23))$R$DIM$($rs.ago)$R"
+            } else {
+                Write-Host "$DIM             $($rs.where.PadRight(23))$($rs.ago)$R"
+            }
+        }
         Write-Host ""
     }
-    Write-Host "$DIM   ** heute   * gestern   . diese woche        ^ = neuer tab    alt+links/rechts = tab-switch$R"
+    Write-Host "$DIM   ** heute   * gestern   . diese woche   pfeil hoch/runter = letzter chat   ^ = neuer tab   alt+links/rechts = tab$R"
     Write-Host ""
 }
 
@@ -318,7 +366,7 @@ function Show-Folder([string]$dir, [string]$root) {
     }
 }
 
-function Start-Claude([string]$dir, [string]$mode, [string]$area) {
+function Start-Claude([string]$dir, [string]$mode, [string]$area, [string]$id = '') {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     $exe = if ($mode -eq 'codex') { 'codex' } else { 'claude' }
     if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) {
@@ -336,7 +384,7 @@ function Start-Claude([string]$dir, [string]$mode, [string]$area) {
     Write-Host ""
     switch ($mode) {
         'continue' { claude --continue }
-        'resume'   { claude --resume }
+        'resume'   { if ($id) { claude --resume $id } else { claude --resume } }
         'codex'    { codex }
         default    { claude }
     }
@@ -351,13 +399,19 @@ while ($true) {
         Step-Rain
         Start-Sleep -Milliseconds 130
     }
-    $k = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
-    Write-Host $k
+    $ki = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    $k = $ki.Character
+    # pfeil hoch/runter: auswahl in den letzten chats, menue neu zeichnen
+    if ($ki.VirtualKeyCode -eq 38 -and $script:Recent.Count) { $script:Sel = ($script:Sel - 1 + $script:Recent.Count) % $script:Recent.Count; continue }
+    if ($ki.VirtualKeyCode -eq 40 -and $script:Recent.Count) { $script:Sel = ($script:Sel + 1) % $script:Recent.Count; continue }
+    if ([int]$k -lt 32) { Write-Host '' } else { Write-Host $k }
 
     if ("$k" -match '^[qQ]$') { exit }
     if ($k -eq [char]13) {
-        $last = Get-LastSession
-        if ($last) { Start-Claude $last.path 'continue' $last.area }
+        if ($script:Recent.Count) {
+            $rs = $script:Recent[$script:Sel]
+            Start-Claude $rs.path 'resume' $rs.area $rs.id
+        }
         continue
     }
     if ("$k" -match '^[oO]$') {
@@ -424,7 +478,21 @@ while ($true) {
         Write-Host ""
         Write-Host "$DIM  copland: verbinde -> assistent$R"
         Write-Host ""
-        claude "/briefing"
+        claude "/briefing"   # chat = fable; delegation pro aufgabe (verfassung: modelle & delegation)
+        continue
+    }
+    if ("$k" -match '^[gG]$') {
+        # general: denkraum/dump-ort (80_general). alles was reinkommt landet in inbox.md, die ernte sortiert nachts.
+        $gdir = Join-Path $OD '80_general'
+        if (-not (Test-Path $gdir)) { New-Item -ItemType Directory -Path $gdir -Force | Out-Null }
+        if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { Warn 'claude nicht gefunden'; continue }
+        Set-Location $gdir
+        $Host.UI.RawUI.WindowTitle = 'general'
+        Clear-Host
+        Write-Host ""
+        Write-Host "$DIM  copland: verbinde -> general (inbox.md, ernte sortiert nachts)$R"
+        Write-Host ""
+        claude   # chat = fable; delegation pro aufgabe (verfassung: modelle & delegation)
         continue
     }
     if ("$k" -match '^[wW]$') {
@@ -684,7 +752,7 @@ while ($true) {
                         @(
                             "# $pname -- Projektkontext"
                             ""
-                            "Bereich: $($sel.label.Trim()) | status: aktiv | alias: $pname"
+                            "Bereich: $($sel.label.Trim().ToUpper()) | status: aktiv | alias: $pname"
                             "Angelegt: $(Get-Date -Format 'yyyy-MM-dd')."
                             ""
                             "## Zweck"
